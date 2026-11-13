@@ -1,0 +1,159 @@
+-- Dino Dash
+-- Space, up or click to jump. Hold down to duck.
+-- Jump over rocks, duck under birds, grab eggs for bonus points.
+
+set ground to 300
+set pull to 0.8
+set dino to new box at 80, ground - 22 size 30, 44 color "#30a46c" fixed
+set vy to 0
+set tall to 44
+set speed to 6
+set score to 0
+set dist to 0
+set timer to 40
+set obstacles to []
+set eggs to []
+set playing to true
+set best to 0
+load best
+
+-- Jumps if the dino is on the ground, or starts a new run after a game over.
+to jump
+  if not playing
+    restart()
+  otherwise if vy is 0 and dino's y is at least ground - tall / 2 - 1
+    set vy to -13
+    play sound "jump"
+  end
+end
+
+when key "space" is pressed
+  jump()
+end
+
+when key "up" is pressed
+  jump()
+end
+
+when mouse is clicked
+  jump()
+end
+
+-- Puts a rock or a bird just off the right side, and sometimes an egg in the air.
+to spawn
+  if score is above 150 and chance(30)
+    set o to new box at width + 30, ground - 40 size 40, 16 color "#8e4ec6" fixed
+  otherwise
+    set h to random 24 to 50
+    set o to new box at width + 30, ground - h / 2 size random 18 to 30, h color "#8a6d4a" fixed
+  end
+  add o to obstacles
+  if chance(35)
+    set egg to new circle at width + random 150 to 230, ground - random 70 to 110 size 16 color "#fff4d6" fixed
+    add egg to eggs
+  end
+end
+
+to gameover
+  set playing to false
+  play sound "hit"
+  if floor(score) is above best
+    set best to floor(score)
+    save best
+  end
+end
+
+to restart
+  remove obstacles
+  remove eggs
+  set obstacles to []
+  set eggs to []
+  set score to 0
+  set speed to 6
+  set vy to 0
+  set timer to 40
+  set playing to true
+end
+
+every frame
+  background "#f7f3e8"
+
+  -- clouds drift slowly
+  for each i from 0 to 2
+    set cx to (i * 190 - dist / 4) mod 560 - 40
+    draw circle at cx, 70 + i * 25 size 50 color "#ffffff"
+    draw circle at cx + 28, 74 + i * 25 size 38 color "#ffffff"
+  end
+
+  -- the ground
+  draw box at 240, ground + 30 size 480, 60 color "#e3d5b3"
+  draw line from 0, ground to width, ground color "#8a6d4a" width 2
+  for each i from 0 to 11
+    draw box at (i * 43 - dist) mod 516 - 18, ground + 14 size 6, 3 color "#b9a27a"
+  end
+
+  if playing
+    -- ducking (only on the ground), then jumping and falling
+    set onground to dino's y + tall / 2 is at least ground - 1
+    set tall to 44
+    if holding "down" and onground then set tall to 26
+    set dino's height to tall
+    if onground and vy is at least 0 then set dino's y to ground - tall / 2
+    change vy by pull
+    change dino's y by vy
+    if dino's y + tall / 2 is above ground
+      set dino's y to ground - tall / 2
+      set vy to 0
+    end
+
+    -- the world scrolls left, faster and faster
+    change dist by speed
+    change speed by 0.003
+    change score by speed / 10
+    change timer by -1
+    if timer is at most 0
+      spawn()
+      set timer to random 45 to 95
+    end
+
+    for each o in obstacles
+      move o by -speed, 0
+      if playing and o touches dino then gameover()
+      if o's x is below -60
+        remove o
+        remove o from obstacles
+      end
+    end
+
+    for each e in eggs
+      move e by -speed, 0
+      if e touches dino
+        change score by 25
+        play sound "coin"
+        remove e
+        remove e from eggs
+      otherwise if e's x is below -20
+        remove e
+        remove e from eggs
+      end
+    end
+  end
+
+  -- the dino's head, eye and legs
+  set top to dino's y - tall / 2
+  draw box at dino's x + 14, top + 7 size 24, 16 color "#30a46c"
+  draw circle at dino's x + 19, top + 5 size 5 color "#1f1f1f"
+  draw box at dino's x - 20, dino's y + 2 size 14, 8 color "#30a46c"
+  set bottom to dino's y + tall / 2
+  if vy is 0 and playing and frame mod 12 is below 6
+    draw line from dino's x - 7, bottom - 1 to dino's x - 7, bottom - 9 color "#1f1f1f" width 4
+  otherwise
+    draw line from dino's x + 7, bottom - 1 to dino's x + 7, bottom - 9 color "#1f1f1f" width 4
+  end
+
+  draw text "Score {floor(score)}    Best {best}" at 12, 10 size 18 color "#4a3d2c"
+  if not playing
+    draw text "Game over" at 172, 120 size 34 color "#1f1f1f"
+    draw text "Press space or click to run again" at 112, 166 size 18 color "#4a3d2c"
+  end
+end

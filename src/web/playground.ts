@@ -1,5 +1,6 @@
 // The playground page: examples, share links and export, around the shared workbench.
 import blank from '../../examples/blank.once';
+import dino from '../../examples/dino-dash.once';
 import bouncing from '../../examples/bouncing-balls.once';
 import hello from '../../examples/hello.once';
 import { exportPage } from './exportpage';
@@ -7,6 +8,7 @@ import { emptyOutput, file, load, run, src, store } from './workbench';
 
 const STORIES: { id: string; title: string; code: string }[] = [
   { id: 'bouncing-balls', title: 'Bouncing balls', code: bouncing },
+  { id: 'dino-dash', title: 'Dino Dash', code: dino },
   { id: 'hello', title: 'Hello, world', code: hello },
   { id: 'blank', title: 'Blank', code: blank },
 ];
