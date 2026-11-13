@@ -1,0 +1,168 @@
+// What every Once word means: shown on hover and in autocomplete (VS Code), with a short example.
+
+export interface WordDoc {
+  /** How it is written, e.g. `repeat N times`. */
+  sig: string;
+  doc: string;
+  example?: string;
+  kind: 'statement' | 'keyword' | 'operator' | 'shape' | 'setting' | 'function' | 'value' | 'property';
+}
+
+const d = (kind: WordDoc['kind'], sig: string, doc: string, example?: string): WordDoc => ({ kind, sig, doc, example });
+
+export const STATEMENTS: Record<string, WordDoc> = {
+  say: d('statement', 'say value', 'Prints a line of text. Inside text, `{name}` is replaced by its value.', 'say "Hello, {name}!"'),
+  set: d('statement', 'set name to value', 'Keeps a value under a name, creating the name if it is new. Also sets properties (`ball\'s x`) and list items (`item 2 of xs`).', 'set score to 0\nset ball\'s color to "gold"'),
+  change: d('statement', 'change name by amount', 'Adds an amount to a number (use a negative amount to subtract). On text, adds the amount to the end.', 'change score by 1\nchange lives by -1'),
+  if: d('statement', 'if condition ... otherwise ... end', 'Runs the steps only when the condition is true. Add `otherwise if` and `otherwise` for other cases. One step can go on the same line with `then`, with no `end`.', 'if score is above 10\n  say "You win"\notherwise\n  say "Keep going"\nend'),
+  otherwise: d('keyword', 'otherwise / otherwise if condition', 'The other path of an `if`. `else` also works.', 'if x is 1\n  say "one"\notherwise\n  say "not one"\nend'),
+  else: d('keyword', 'else', 'Same as `otherwise`.'),
+  then: d('keyword', 'if condition then step', 'Puts a single step on the same line as its `if`. No `end` is needed.', 'if lives is 0 then the end'),
+  end: d('keyword', 'end', 'Closes a block: if, repeat, for each, to, every or when. You can write `end if`, `end repeat` and so on for clarity.'),
+  repeat: d('statement', 'repeat N times / repeat while c / repeat until c / repeat forever', 'Runs the steps again and again. `repeat forever` runs once per frame (60 times a second) and never freezes the page.', 'repeat 3 times\n  say "knock"\nend'),
+  times: d('keyword', 'repeat N times', 'How many times a `repeat` runs.'),
+  while: d('keyword', 'repeat while condition', 'Keeps repeating while the condition stays true.', 'repeat while x is below 100\n  set x to x * 2\nend'),
+  until: d('keyword', 'repeat until condition', 'Keeps repeating until the condition becomes true.'),
+  forever: d('keyword', 'repeat forever', 'Repeats once per frame until the program ends or a `stop` runs. Drawings inside are redrawn each frame.'),
+  for: d('statement', 'for each name in list / for each name from a to b [by step]', 'Runs the steps once for each item of a list (or each letter of text), or for each number in a range. Ranges include both ends.', 'for each n from 1 to 5\n  say n\nend\nfor each pet in pets\n  say pet\nend'),
+  each: d('keyword', 'for each name in list', 'Part of a `for each` loop.'),
+  in: d('keyword', 'for each name in list', 'Goes through a list, text or record.'),
+  from: d('keyword', 'for each n from a to b / draw line from x, y', 'The start of a counting range, or where a line starts.'),
+  by: d('keyword', 'change x by n / for each n from a to b by step', 'How much to change by, or the step when counting.'),
+  to: d('statement', 'to name input1 and input2 ... end', 'Defines your own instructions. Use them by writing `name(values)`. `give back` returns a value. Must be at the top level.', 'to area w and h\n  give back w * h\nend\nsay area(3, 4)'),
+  give: d('statement', 'give back value', 'Ends the current `to` instructions and hands a value back to where they were used.', 'to double x\n  give back x * 2\nend'),
+  back: d('keyword', 'give back value', 'Part of `give back`.'),
+  stop: d('statement', 'stop', 'Leaves the loop it is in right away.'),
+  skip: d('statement', 'skip', 'Jumps to the next turn of the loop it is in.'),
+  the: d('statement', 'the end', 'Ends the whole program. Everything stops.', 'if lives is 0 then the end'),
+  wait: d('statement', 'wait N seconds', 'Pauses this part of the program. Everything else keeps running.', 'wait 0.5 seconds'),
+  every: d('statement', 'every frame ... end / every N seconds ... end', '`every frame` runs 60 times a second; its drawings are wiped and redrawn each time, so they can move. `every N seconds` runs on a clock. Must be at the top level.', 'every frame\n  draw circle at mouse\'s x, mouse\'s y size 20\nend'),
+  when: d('statement', 'when key "k" is pressed / when mouse is clicked / when a touches b', 'Waits for something to happen, then runs the steps. Touch events fire once, when the shapes first meet. Must be at the top level.', 'when key "space" is pressed\n  set hero\'s dy to -8\nend'),
+  key: d('keyword', 'when key "name" is pressed', 'Key names: "left", "right", "up", "down", "space", "enter", "escape", a letter like "a", or "any".'),
+  pressed: d('keyword', 'when key "name" is pressed', 'Fires once each time the key goes down.'),
+  clicked: d('keyword', 'when mouse is clicked', 'Fires each time the preview is clicked or tapped.'),
+  frame: d('value', 'every frame / frame', 'In `every frame`: 60 times a second. On its own, `frame` is how many frames have run so far.'),
+  seconds: d('keyword', 'wait N seconds / every N seconds', 'Time is counted in seconds. `second` also works.'),
+  second: d('keyword', 'wait 1 second', 'Same as `seconds`.'),
+  draw: d('statement', 'draw circle|box|line|text ...settings', 'Draws a shape. Inside `every frame` or `repeat forever` it lasts one frame; elsewhere it stays until `clear`.', 'draw circle at 240, 180 size 60 color "tomato"\ndraw text "Score: {score}" at 10, 10'),
+  background: d('statement', 'background color', 'Fills the whole preview with a color, behind everything.', 'background "skyblue"'),
+  clear: d('statement', 'clear', 'Wipes everything drawn outside `every frame`.'),
+  play: d('statement', 'play note "C4" [for s] [wave w] [volume v] / play sound "name"', 'Plays a musical note or a ready-made sound.', 'play note "E5" for 0.2\nplay sound "coin"'),
+  note: d('keyword', 'play note "C4" for 0.5', 'A note name like "C4" (middle C), "F#5" or "Bb3", or a number (60 is middle C).'),
+  sound: d('keyword', 'play sound "name"', 'Sounds: "beep", "boop", "coin", "jump", "pop", "hit", "boom", "click".'),
+  add: d('statement', 'add value to list', 'Puts a value at the end of a list.', 'add "fox" to pets'),
+  remove: d('statement', 'remove value from list / remove shape', 'Takes the first matching value out of a list, or takes a shape off the screen.', 'remove "owl" from pets\nremove coin'),
+  hide: d('statement', 'hide shape', 'Hides a shape. It stops touching things until you `show` it.'),
+  show: d('statement', 'show shape', 'Shows a hidden shape again.'),
+  new: d('statement', 'new circle|box|text ...settings', 'Makes a shape that stays on screen and moves by itself. Keep it in a name to change it later.', 'set ball to new circle at 100, 50 size 30 moving 3, 0 bouncy'),
+};
+
+export const OPERATORS: Record<string, WordDoc> = {
+  is: d('operator', 'a is b / is not / is above / is below / is at least / is at most', 'Compares two values. Lists and records are equal when their contents are equal.', 'if score is at least 10 then say "nice"'),
+  not: d('operator', 'not condition / is not', 'Flips true and false.', 'if not holding "space" then say "let go"'),
+  and: d('operator', 'a and b', 'True when both sides are true. Also joins inputs in `to name a and b`.'),
+  or: d('operator', 'a or b', 'True when either side is true.'),
+  above: d('operator', 'a is above b', 'Greater than. Same as `>`.'),
+  below: d('operator', 'a is below b', 'Less than. Same as `<`.'),
+  least: d('operator', 'a is at least b', 'Greater than or equal. Same as `>=`.'),
+  most: d('operator', 'a is at most b', 'Less than or equal. Same as `<=`.'),
+  mod: d('operator', 'a mod b', 'The remainder after dividing. Always 0 or more for a positive b.', 'say 7 mod 3   -- 1'),
+  random: d('operator', 'random a to b', 'A random number between a and b. Whole numbers give a whole number, including both ends.', 'set roll to random 1 to 6'),
+  any: d('operator', 'any of list', 'Picks one item at random.', 'set c to any of ["red", "gold", "teal"]'),
+  of: d('operator', 'name of value / item n of list / any of list', '`length of xs` is the same as `length(xs)`: any one-input instruction can be written with `of`.'),
+  item: d('operator', 'item n of list', 'The nth item. Lists count from 1; negative numbers count from the end. Same as `list[n]`.', 'say item 1 of names'),
+  holding: d('operator', 'holding "key"', 'True while the key is held down.', 'if holding "left" then change hero\'s x by -4'),
+  touches: d('operator', 'a touches b / a touches edge', 'True when two shapes overlap. Either side can be a list of shapes. `edge` is the border of the preview.', 'if ball touches paddle then set ball\'s dy to -5'),
+  contains: d('operator', 'list contains value / text contains text', 'True when the value is in the list (or the text is inside the text).'),
+  true: d('value', 'true', 'Yes.'),
+  false: d('value', 'false', 'No. `false`, `nothing`, `0` and `""` all count as no in an `if`.'),
+  nothing: d('value', 'nothing', 'No value at all. Instructions without `give back` give back nothing.'),
+};
+
+export const SHAPES: Record<string, WordDoc> = {
+  circle: d('shape', 'circle at x, y size s', 'A circle. `at` is its middle; `size` is how wide it is.', 'draw circle at 240, 180 size 50 color "gold"'),
+  box: d('shape', 'box at x, y size w, h', 'A rectangle. `at` is its middle. `angle` turns it. Also `square` and `rectangle`.', 'draw box at 240, 330 size 480, 60 color "seagreen"'),
+  line: d('shape', 'line from x, y to x, y', 'A straight line. `width` sets how thick.', 'draw line from 0, 0 to 480, 360 width 3'),
+  text: d('shape', 'text "words" at x, y size s', 'Text. `at` is its top left corner; `size` is the font size.', 'draw text "Score: {score}" at 10, 10 size 24'),
+};
+
+export const SETTINGS: Record<string, WordDoc> = {
+  at: d('setting', 'at x, y', 'Where it goes. The middle for circles and boxes, the top left for text. (0, 0) is the top left of the preview.'),
+  size: d('setting', 'size s / size w, h', 'How big: the width of a circle, the width and height of a box, the font size of text.'),
+  color: d('setting', 'color "name"', 'A color: a name like "tomato", a code like "#0078d4", or rgb(...) / hsl(...).'),
+  outline: d('setting', 'outline [thickness]', 'Draws just the outline instead of filling it.'),
+  angle: d('setting', 'angle degrees', 'Turns a box.'),
+  width: d('setting', 'width w', 'How wide a box is, or how thick a line is. On its own, `width` is the preview width (480).'),
+  height: d('setting', 'height h', 'How tall a box is. On its own, `height` is the preview height (360).'),
+  moving: d('setting', 'moving dx, dy', 'A `new` shape moves this far across and down every frame.'),
+  bouncy: d('setting', 'bouncy [amount]', 'A `new` shape bounces off the edges. `bouncy 0.8` loses some speed each bounce; `bouncy 0` just stops at the edges.'),
+  solid: d('setting', 'solid', 'A `new` shape bumps into other solid shapes instead of passing through.'),
+  fixed: d('setting', 'fixed', 'A `new` shape never moves by itself and isn\'t pulled by gravity. Good for walls.'),
+  hidden: d('setting', 'hidden', 'A `new` shape starts out hidden. Use `show` later.'),
+  wave: d('setting', 'wave "triangle"|"sine"|"square"|"sawtooth"', 'The voice of a `play note`.'),
+  volume: d('setting', 'volume 0 to 1', 'How loud a note or sound is. 0.5 is the default.'),
+};
+
+export const FUNCTIONS: Record<string, WordDoc> = {
+  sqrt: d('function', 'sqrt(x)', 'The square root.', 'sqrt(16)   -- 4'),
+  abs: d('function', 'abs(x)', 'The number without its minus sign.', 'abs(-3)   -- 3'),
+  round: d('function', 'round(x) / round(x, places)', 'Rounds to the nearest whole number, or to some decimal places.', 'round(3.14159, 2)   -- 3.14'),
+  floor: d('function', 'floor(x)', 'Rounds down.'),
+  ceil: d('function', 'ceil(x)', 'Rounds up.'),
+  sin: d('function', 'sin(degrees)', 'Sine of an angle in degrees.', 'sin(90)   -- 1'),
+  cos: d('function', 'cos(degrees)', 'Cosine of an angle in degrees.'),
+  tan: d('function', 'tan(degrees)', 'Tangent of an angle in degrees.'),
+  angle: d('function', 'angle(dx, dy)', 'The direction of a movement, in degrees. As a setting, `angle` turns a box.'),
+  distance: d('function', 'distance(a, b) / distance(x1, y1, x2, y2)', 'How far apart two shapes, or two points, are.'),
+  min: d('function', 'min(a, b, ...) / min(list)', 'The smallest number.'),
+  max: d('function', 'max(a, b, ...) / max(list)', 'The largest number.'),
+  sum: d('function', 'sum(list)', 'All the numbers in a list added up.'),
+  clamp: d('function', 'clamp(x, low, high)', 'Keeps x between low and high.', 'set x to clamp(x, 0, width)'),
+  text: d('function', 'text(value)', 'Turns any value into text.'),
+  number: d('function', 'number(text)', 'Turns text like "42" into a number.'),
+  length: d('function', 'length(list or text)', 'How many items or letters. Also `length of xs` and `xs\'s length`.'),
+  upper: d('function', 'upper(text)', 'Text in capital letters.'),
+  lower: d('function', 'lower(text)', 'Text in small letters.'),
+  join: d('function', 'join(list, separator)', 'Glues a list into text.', 'join(["a", "b"], ", ")   -- "a, b"'),
+  split: d('function', 'split(text, separator)', 'Cuts text into a list. Without a separator, into letters.'),
+  range: d('function', 'range(a, b)', 'A list of the whole numbers from a to b.'),
+  sort: d('function', 'sort(list)', 'A sorted copy of a list of numbers or of text.'),
+  reverse: d('function', 'reverse(list or text)', 'A backwards copy.'),
+  find: d('function', 'find(list, value)', 'Where the value is (counting from 1), or 0 if it isn\'t there.'),
+  keys: d('function', 'keys(record)', 'The names inside a record, as a list.'),
+  rgb: d('function', 'rgb(r, g, b)', 'A color from red, green and blue, each 0 to 255.'),
+  hsl: d('function', 'hsl(hue, saturation, lightness)', 'A color from hue (0 to 360), saturation and lightness (0 to 100).'),
+};
+
+export const GLOBALS: Record<string, WordDoc> = {
+  width: d('value', 'width', 'The width of the preview: 480.'),
+  height: d('value', 'height', 'The height of the preview: 360.'),
+  mouse: d('value', "mouse's x, mouse's y, mouse's down", 'Where the mouse is over the preview, and whether a button is down.'),
+  edge: d('value', 'edge', 'The border of the preview, for `touches`.', 'when ball touches edge\n  play sound "click"\nend'),
+  gravity: d('value', 'set gravity to 0.4', 'How fast shapes made with `new` fall. 0 at the start. Fixed shapes don\'t fall.'),
+  time: d('value', 'time', 'Seconds since the program started.'),
+  frame: d('value', 'frame', 'How many frames have run (60 a second).'),
+  pi: d('value', 'pi', '3.14159...'),
+};
+
+export const PROPERTIES: Record<string, WordDoc> = {
+  x: d('property', "shape's x", 'Across: the middle of a circle or box, the left of text.'),
+  y: d('property', "shape's y", 'Down: the middle of a circle or box, the top of text.'),
+  dx: d('property', "shape's dx", 'How far it moves across each frame.'),
+  dy: d('property', "shape's dy", 'How far it moves down each frame. Negative goes up.'),
+  speed: d('property', "shape's speed", 'How fast it is moving (read only).'),
+  size: d('property', "shape's size", 'Its width, or font size for text.'),
+  width: d('property', "shape's width", 'How wide it is.'),
+  height: d('property', "shape's height", 'How tall it is.'),
+  color: d('property', "shape's color", 'Its color.'),
+  bouncy: d('property', "shape's bouncy", 'How bouncy it is (0 means it stops at the edges).'),
+  solid: d('property', "shape's solid", 'Whether it bumps into other solid shapes.'),
+  fixed: d('property', "shape's fixed", 'Whether it stays still.'),
+  hidden: d('property', "shape's hidden", 'Whether it is hidden.'),
+  text: d('property', "shape's text", 'The words of a text shape.'),
+  kind: d('property', "shape's kind", '"circle", "box" or "text".'),
+  angle: d('property', "shape's angle", 'How far a box is turned, in degrees.'),
+  length: d('property', "list's length", 'How many items. Lists also have `first` and `last`.'),
+  first: d('property', "list's first", 'The first item.'),
+  last: d('property', "list's last", 'The last item.'),
+};

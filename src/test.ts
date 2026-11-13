@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { OnceError, formatError } from './errors';
 import { Runner } from './interp';
 import { parse } from './parser';
+import { completions, explain, signatureAt } from './explain';
 
 const root = join(__dirname, '..');
 let passed = 0, failed = 0;
@@ -62,6 +63,38 @@ for (const [name, code] of listings) {
   const expected = name.startsWith('book') && code.includes('say scroe');
   report(name, expected ? !!err : !err, err ? formatError(err, code, name) : 'expected the deliberate mistake to be reported');
 }
+
+// Hover explanations: [source, line, col, text the hover must contain]
+const hoverSrc = [
+  '-- Doubles a number.',
+  'to double x',
+  '  give back x * 2',
+  'end',
+  'set score to 0',
+  'set ball to new circle at 10, 20 size 30 moving 2, 0 bouncy',
+  'every frame',
+  '  draw text "s {score}" at 10, 10',
+  '  if ball touches edge then change score by double(1)',
+  '  say sqrt(ball\'s x)',
+  'end',
+].join('\n');
+const hovers: [number, string, string][] = [
+  [1, 'double', 'your instructions'], [8, 'double', 'Doubles a number.'], [2, 'x', 'input of `double`'], [4, 'score', 'first set on line 5'],
+  [5, 'circle', 'shape'], [5, ' at', 'Where it goes'], [5, 'moving', 'moves this far'], [5, 'bouncy', 'bounces off the edges'],
+  [6, 'every', 'every frame'], [7, 'draw', 'Draws a shape'], [7, 'text', 'Text.'], [7, 'score', 'score'], [8, 'touches', 'overlap'], [8, 'edge', 'border of the preview'],
+  [9, 'sqrt', 'square root'], [9, "x)", 'Across'], [4, 'to', 'The value to keep'], [0, 'Doubles', ''], [7, ' s ', ''],
+];
+for (const [l, w, want] of hovers) {
+  const lineText = hoverSrc.split('\n')[l];
+  const c = lineText.indexOf(w) + (w.startsWith(' ') ? 1 : 0);
+  const r = explain(hoverSrc, l, c);
+  const ok = want === '' ? r === null : !!r && r.markdown.includes(want);
+  report(`hover line ${l + 1} "${w.trim()}"`, ok, `wanted "${want}", got:\n${r?.markdown ?? 'nothing'}`);
+}
+const sig = signatureAt('say clamp(1, 2', 0, 14);
+report('signature help', !!sig && sig.label === 'clamp(x, low, high)' && sig.active === 1, JSON.stringify(sig));
+const comp = completions('set ball to 1\nsay ba', 1, 6).map((c) => c.label);
+report('completions', comp.includes('ball') && comp.includes('sqrt'), comp.slice(0, 10).join(', '));
 
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

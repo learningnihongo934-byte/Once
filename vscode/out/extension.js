@@ -56,15 +56,15 @@ function syntaxError(span2, msg, hint) {
 }
 function distance(a, b) {
   const m = a.length, n = b.length;
-  const d = Array.from({ length: m + 1 }, (_, i) => Array.from({ length: n + 1 }, (_2, j) => i === 0 ? j : j === 0 ? i : 0));
+  const d2 = Array.from({ length: m + 1 }, (_, i) => Array.from({ length: n + 1 }, (_2, j) => i === 0 ? j : j === 0 ? i : 0));
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
-      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      d2[i][j] = Math.min(d2[i - 1][j] + 1, d2[i][j - 1] + 1, d2[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d2[i][j] = Math.min(d2[i][j], d2[i - 2][j - 2] + 1);
     }
   }
-  return d[m][n];
+  return d2[m][n];
 }
 function closest(word, options) {
   const w = word.toLowerCase();
@@ -73,9 +73,9 @@ function closest(word, options) {
   const limit = Math.max(1, Math.floor(word.length / 3));
   for (const o of options) {
     if (o === word) continue;
-    const d = distance(w, o.toLowerCase());
-    if (d < bestD) {
-      bestD = d;
+    const d2 = distance(w, o.toLowerCase());
+    if (d2 < bestD) {
+      bestD = d2;
       best = o;
     }
   }
@@ -192,14 +192,14 @@ function lex(src, lineOffset = 0, colOffset = 0) {
           if (buf) parts.push(buf);
           buf = "";
           const pl = line, pc = col + 1;
-          let j = i + 1, d = 1, inStr = false;
+          let j = i + 1, d2 = 1, inStr = false;
           while (j < src.length && src[j] !== "\n") {
             const cj = src[j];
             if (inStr) {
               if (cj === '"') inStr = false;
             } else if (cj === '"') inStr = true;
-            else if (cj === "{") d++;
-            else if (cj === "}" && --d === 0) break;
+            else if (cj === "{") d2++;
+            else if (cj === "}" && --d2 === 0) break;
             j++;
           }
           if (src[j] !== "}") {
@@ -1145,6 +1145,360 @@ function srcOf(e) {
   return "it";
 }
 
+// src/worddocs.ts
+var d = (kind, sig, doc, example) => ({ kind, sig, doc, example });
+var STATEMENTS2 = {
+  say: d("statement", "say value", "Prints a line of text. Inside text, `{name}` is replaced by its value.", 'say "Hello, {name}!"'),
+  set: d("statement", "set name to value", "Keeps a value under a name, creating the name if it is new. Also sets properties (`ball's x`) and list items (`item 2 of xs`).", `set score to 0
+set ball's color to "gold"`),
+  change: d("statement", "change name by amount", "Adds an amount to a number (use a negative amount to subtract). On text, adds the amount to the end.", "change score by 1\nchange lives by -1"),
+  if: d("statement", "if condition ... otherwise ... end", "Runs the steps only when the condition is true. Add `otherwise if` and `otherwise` for other cases. One step can go on the same line with `then`, with no `end`.", 'if score is above 10\n  say "You win"\notherwise\n  say "Keep going"\nend'),
+  otherwise: d("keyword", "otherwise / otherwise if condition", "The other path of an `if`. `else` also works.", 'if x is 1\n  say "one"\notherwise\n  say "not one"\nend'),
+  else: d("keyword", "else", "Same as `otherwise`."),
+  then: d("keyword", "if condition then step", "Puts a single step on the same line as its `if`. No `end` is needed.", "if lives is 0 then the end"),
+  end: d("keyword", "end", "Closes a block: if, repeat, for each, to, every or when. You can write `end if`, `end repeat` and so on for clarity."),
+  repeat: d("statement", "repeat N times / repeat while c / repeat until c / repeat forever", "Runs the steps again and again. `repeat forever` runs once per frame (60 times a second) and never freezes the page.", 'repeat 3 times\n  say "knock"\nend'),
+  times: d("keyword", "repeat N times", "How many times a `repeat` runs."),
+  while: d("keyword", "repeat while condition", "Keeps repeating while the condition stays true.", "repeat while x is below 100\n  set x to x * 2\nend"),
+  until: d("keyword", "repeat until condition", "Keeps repeating until the condition becomes true."),
+  forever: d("keyword", "repeat forever", "Repeats once per frame until the program ends or a `stop` runs. Drawings inside are redrawn each frame."),
+  for: d("statement", "for each name in list / for each name from a to b [by step]", "Runs the steps once for each item of a list (or each letter of text), or for each number in a range. Ranges include both ends.", "for each n from 1 to 5\n  say n\nend\nfor each pet in pets\n  say pet\nend"),
+  each: d("keyword", "for each name in list", "Part of a `for each` loop."),
+  in: d("keyword", "for each name in list", "Goes through a list, text or record."),
+  from: d("keyword", "for each n from a to b / draw line from x, y", "The start of a counting range, or where a line starts."),
+  by: d("keyword", "change x by n / for each n from a to b by step", "How much to change by, or the step when counting."),
+  to: d("statement", "to name input1 and input2 ... end", "Defines your own instructions. Use them by writing `name(values)`. `give back` returns a value. Must be at the top level.", "to area w and h\n  give back w * h\nend\nsay area(3, 4)"),
+  give: d("statement", "give back value", "Ends the current `to` instructions and hands a value back to where they were used.", "to double x\n  give back x * 2\nend"),
+  back: d("keyword", "give back value", "Part of `give back`."),
+  stop: d("statement", "stop", "Leaves the loop it is in right away."),
+  skip: d("statement", "skip", "Jumps to the next turn of the loop it is in."),
+  the: d("statement", "the end", "Ends the whole program. Everything stops.", "if lives is 0 then the end"),
+  wait: d("statement", "wait N seconds", "Pauses this part of the program. Everything else keeps running.", "wait 0.5 seconds"),
+  every: d("statement", "every frame ... end / every N seconds ... end", "`every frame` runs 60 times a second; its drawings are wiped and redrawn each time, so they can move. `every N seconds` runs on a clock. Must be at the top level.", "every frame\n  draw circle at mouse's x, mouse's y size 20\nend"),
+  when: d("statement", 'when key "k" is pressed / when mouse is clicked / when a touches b', "Waits for something to happen, then runs the steps. Touch events fire once, when the shapes first meet. Must be at the top level.", `when key "space" is pressed
+  set hero's dy to -8
+end`),
+  key: d("keyword", 'when key "name" is pressed', 'Key names: "left", "right", "up", "down", "space", "enter", "escape", a letter like "a", or "any".'),
+  pressed: d("keyword", 'when key "name" is pressed', "Fires once each time the key goes down."),
+  clicked: d("keyword", "when mouse is clicked", "Fires each time the preview is clicked or tapped."),
+  frame: d("value", "every frame / frame", "In `every frame`: 60 times a second. On its own, `frame` is how many frames have run so far."),
+  seconds: d("keyword", "wait N seconds / every N seconds", "Time is counted in seconds. `second` also works."),
+  second: d("keyword", "wait 1 second", "Same as `seconds`."),
+  draw: d("statement", "draw circle|box|line|text ...settings", "Draws a shape. Inside `every frame` or `repeat forever` it lasts one frame; elsewhere it stays until `clear`.", 'draw circle at 240, 180 size 60 color "tomato"\ndraw text "Score: {score}" at 10, 10'),
+  background: d("statement", "background color", "Fills the whole preview with a color, behind everything.", 'background "skyblue"'),
+  clear: d("statement", "clear", "Wipes everything drawn outside `every frame`."),
+  play: d("statement", 'play note "C4" [for s] [wave w] [volume v] / play sound "name"', "Plays a musical note or a ready-made sound.", 'play note "E5" for 0.2\nplay sound "coin"'),
+  note: d("keyword", 'play note "C4" for 0.5', 'A note name like "C4" (middle C), "F#5" or "Bb3", or a number (60 is middle C).'),
+  sound: d("keyword", 'play sound "name"', 'Sounds: "beep", "boop", "coin", "jump", "pop", "hit", "boom", "click".'),
+  add: d("statement", "add value to list", "Puts a value at the end of a list.", 'add "fox" to pets'),
+  remove: d("statement", "remove value from list / remove shape", "Takes the first matching value out of a list, or takes a shape off the screen.", 'remove "owl" from pets\nremove coin'),
+  hide: d("statement", "hide shape", "Hides a shape. It stops touching things until you `show` it."),
+  show: d("statement", "show shape", "Shows a hidden shape again."),
+  new: d("statement", "new circle|box|text ...settings", "Makes a shape that stays on screen and moves by itself. Keep it in a name to change it later.", "set ball to new circle at 100, 50 size 30 moving 3, 0 bouncy")
+};
+var OPERATORS = {
+  is: d("operator", "a is b / is not / is above / is below / is at least / is at most", "Compares two values. Lists and records are equal when their contents are equal.", 'if score is at least 10 then say "nice"'),
+  not: d("operator", "not condition / is not", "Flips true and false.", 'if not holding "space" then say "let go"'),
+  and: d("operator", "a and b", "True when both sides are true. Also joins inputs in `to name a and b`."),
+  or: d("operator", "a or b", "True when either side is true."),
+  above: d("operator", "a is above b", "Greater than. Same as `>`."),
+  below: d("operator", "a is below b", "Less than. Same as `<`."),
+  least: d("operator", "a is at least b", "Greater than or equal. Same as `>=`."),
+  most: d("operator", "a is at most b", "Less than or equal. Same as `<=`."),
+  mod: d("operator", "a mod b", "The remainder after dividing. Always 0 or more for a positive b.", "say 7 mod 3   -- 1"),
+  random: d("operator", "random a to b", "A random number between a and b. Whole numbers give a whole number, including both ends.", "set roll to random 1 to 6"),
+  any: d("operator", "any of list", "Picks one item at random.", 'set c to any of ["red", "gold", "teal"]'),
+  of: d("operator", "name of value / item n of list / any of list", "`length of xs` is the same as `length(xs)`: any one-input instruction can be written with `of`."),
+  item: d("operator", "item n of list", "The nth item. Lists count from 1; negative numbers count from the end. Same as `list[n]`.", "say item 1 of names"),
+  holding: d("operator", 'holding "key"', "True while the key is held down.", `if holding "left" then change hero's x by -4`),
+  touches: d("operator", "a touches b / a touches edge", "True when two shapes overlap. Either side can be a list of shapes. `edge` is the border of the preview.", "if ball touches paddle then set ball's dy to -5"),
+  contains: d("operator", "list contains value / text contains text", "True when the value is in the list (or the text is inside the text)."),
+  true: d("value", "true", "Yes."),
+  false: d("value", "false", 'No. `false`, `nothing`, `0` and `""` all count as no in an `if`.'),
+  nothing: d("value", "nothing", "No value at all. Instructions without `give back` give back nothing.")
+};
+var SHAPES2 = {
+  circle: d("shape", "circle at x, y size s", "A circle. `at` is its middle; `size` is how wide it is.", 'draw circle at 240, 180 size 50 color "gold"'),
+  box: d("shape", "box at x, y size w, h", "A rectangle. `at` is its middle. `angle` turns it. Also `square` and `rectangle`.", 'draw box at 240, 330 size 480, 60 color "seagreen"'),
+  line: d("shape", "line from x, y to x, y", "A straight line. `width` sets how thick.", "draw line from 0, 0 to 480, 360 width 3"),
+  text: d("shape", 'text "words" at x, y size s', "Text. `at` is its top left corner; `size` is the font size.", 'draw text "Score: {score}" at 10, 10 size 24')
+};
+var SETTINGS = {
+  at: d("setting", "at x, y", "Where it goes. The middle for circles and boxes, the top left for text. (0, 0) is the top left of the preview."),
+  size: d("setting", "size s / size w, h", "How big: the width of a circle, the width and height of a box, the font size of text."),
+  color: d("setting", 'color "name"', 'A color: a name like "tomato", a code like "#0078d4", or rgb(...) / hsl(...).'),
+  outline: d("setting", "outline [thickness]", "Draws just the outline instead of filling it."),
+  angle: d("setting", "angle degrees", "Turns a box."),
+  width: d("setting", "width w", "How wide a box is, or how thick a line is. On its own, `width` is the preview width (480)."),
+  height: d("setting", "height h", "How tall a box is. On its own, `height` is the preview height (360)."),
+  moving: d("setting", "moving dx, dy", "A `new` shape moves this far across and down every frame."),
+  bouncy: d("setting", "bouncy [amount]", "A `new` shape bounces off the edges. `bouncy 0.8` loses some speed each bounce; `bouncy 0` just stops at the edges."),
+  solid: d("setting", "solid", "A `new` shape bumps into other solid shapes instead of passing through."),
+  fixed: d("setting", "fixed", "A `new` shape never moves by itself and isn't pulled by gravity. Good for walls."),
+  hidden: d("setting", "hidden", "A `new` shape starts out hidden. Use `show` later."),
+  wave: d("setting", 'wave "triangle"|"sine"|"square"|"sawtooth"', "The voice of a `play note`."),
+  volume: d("setting", "volume 0 to 1", "How loud a note or sound is. 0.5 is the default.")
+};
+var FUNCTIONS = {
+  sqrt: d("function", "sqrt(x)", "The square root.", "sqrt(16)   -- 4"),
+  abs: d("function", "abs(x)", "The number without its minus sign.", "abs(-3)   -- 3"),
+  round: d("function", "round(x) / round(x, places)", "Rounds to the nearest whole number, or to some decimal places.", "round(3.14159, 2)   -- 3.14"),
+  floor: d("function", "floor(x)", "Rounds down."),
+  ceil: d("function", "ceil(x)", "Rounds up."),
+  sin: d("function", "sin(degrees)", "Sine of an angle in degrees.", "sin(90)   -- 1"),
+  cos: d("function", "cos(degrees)", "Cosine of an angle in degrees."),
+  tan: d("function", "tan(degrees)", "Tangent of an angle in degrees."),
+  angle: d("function", "angle(dx, dy)", "The direction of a movement, in degrees. As a setting, `angle` turns a box."),
+  distance: d("function", "distance(a, b) / distance(x1, y1, x2, y2)", "How far apart two shapes, or two points, are."),
+  min: d("function", "min(a, b, ...) / min(list)", "The smallest number."),
+  max: d("function", "max(a, b, ...) / max(list)", "The largest number."),
+  sum: d("function", "sum(list)", "All the numbers in a list added up."),
+  clamp: d("function", "clamp(x, low, high)", "Keeps x between low and high.", "set x to clamp(x, 0, width)"),
+  text: d("function", "text(value)", "Turns any value into text."),
+  number: d("function", "number(text)", 'Turns text like "42" into a number.'),
+  length: d("function", "length(list or text)", "How many items or letters. Also `length of xs` and `xs's length`."),
+  upper: d("function", "upper(text)", "Text in capital letters."),
+  lower: d("function", "lower(text)", "Text in small letters."),
+  join: d("function", "join(list, separator)", "Glues a list into text.", 'join(["a", "b"], ", ")   -- "a, b"'),
+  split: d("function", "split(text, separator)", "Cuts text into a list. Without a separator, into letters."),
+  range: d("function", "range(a, b)", "A list of the whole numbers from a to b."),
+  sort: d("function", "sort(list)", "A sorted copy of a list of numbers or of text."),
+  reverse: d("function", "reverse(list or text)", "A backwards copy."),
+  find: d("function", "find(list, value)", "Where the value is (counting from 1), or 0 if it isn't there."),
+  keys: d("function", "keys(record)", "The names inside a record, as a list."),
+  rgb: d("function", "rgb(r, g, b)", "A color from red, green and blue, each 0 to 255."),
+  hsl: d("function", "hsl(hue, saturation, lightness)", "A color from hue (0 to 360), saturation and lightness (0 to 100).")
+};
+var GLOBALS = {
+  width: d("value", "width", "The width of the preview: 480."),
+  height: d("value", "height", "The height of the preview: 360."),
+  mouse: d("value", "mouse's x, mouse's y, mouse's down", "Where the mouse is over the preview, and whether a button is down."),
+  edge: d("value", "edge", "The border of the preview, for `touches`.", 'when ball touches edge\n  play sound "click"\nend'),
+  gravity: d("value", "set gravity to 0.4", "How fast shapes made with `new` fall. 0 at the start. Fixed shapes don't fall."),
+  time: d("value", "time", "Seconds since the program started."),
+  frame: d("value", "frame", "How many frames have run (60 a second)."),
+  pi: d("value", "pi", "3.14159...")
+};
+var PROPERTIES = {
+  x: d("property", "shape's x", "Across: the middle of a circle or box, the left of text."),
+  y: d("property", "shape's y", "Down: the middle of a circle or box, the top of text."),
+  dx: d("property", "shape's dx", "How far it moves across each frame."),
+  dy: d("property", "shape's dy", "How far it moves down each frame. Negative goes up."),
+  speed: d("property", "shape's speed", "How fast it is moving (read only)."),
+  size: d("property", "shape's size", "Its width, or font size for text."),
+  width: d("property", "shape's width", "How wide it is."),
+  height: d("property", "shape's height", "How tall it is."),
+  color: d("property", "shape's color", "Its color."),
+  bouncy: d("property", "shape's bouncy", "How bouncy it is (0 means it stops at the edges)."),
+  solid: d("property", "shape's solid", "Whether it bumps into other solid shapes."),
+  fixed: d("property", "shape's fixed", "Whether it stays still."),
+  hidden: d("property", "shape's hidden", "Whether it is hidden."),
+  text: d("property", "shape's text", "The words of a text shape."),
+  kind: d("property", "shape's kind", '"circle", "box" or "text".'),
+  angle: d("property", "shape's angle", "How far a box is turned, in degrees."),
+  length: d("property", "list's length", "How many items. Lists also have `first` and `last`."),
+  first: d("property", "list's first", "The first item."),
+  last: d("property", "list's last", "The last item.")
+};
+
+// src/explain.ts
+function symbols(src) {
+  const lines = src.split("\n");
+  const fns = /* @__PURE__ */ new Map();
+  const vars = /* @__PURE__ */ new Map();
+  lines.forEach((raw, i) => {
+    const l = raw.replace(/--.*$/, "");
+    let m = /^\s*to\s+([A-Za-z_]\w*)\s*(?:with\s+)?(.*)$/.exec(l);
+    if (m && !fns.has(m[1])) {
+      const params = m[2].split(/\s*(?:,|\band\b)\s*/).map((p) => p.trim()).filter((p) => /^[A-Za-z_]\w*$/.test(p));
+      const comment = [];
+      for (let j = i - 1; j >= 0 && /^\s*--/.test(lines[j]); j--) comment.unshift(lines[j].replace(/^\s*--\s?/, ""));
+      fns.set(m[1], { name: m[1], params, line: i, comment: comment.join("\n") });
+      return;
+    }
+    m = /^\s*set\s+([A-Za-z_]\w*)\s+to\s+(.*)$/.exec(l);
+    if (m && !vars.has(m[1])) {
+      vars.set(m[1], { name: m[1], line: i, text: l.trim() });
+      return;
+    }
+    m = /^\s*for\s+(?:each\s+)?([A-Za-z_]\w*)\s+(in|from)\b/.exec(l);
+    if (m && !vars.has(m[1])) vars.set(m[1], { name: m[1], line: i, text: l.trim() });
+  });
+  return { fns, vars };
+}
+function fence(code) {
+  return "```once\n" + code + "\n```";
+}
+function formatDoc(w, label) {
+  const head = label ? `*${label}*
+
+` : "";
+  return head + fence(w.sig) + "\n\n" + w.doc + (w.example ? "\n\n**Example**\n\n" + fence(w.example) : "");
+}
+function zone(line, col) {
+  let inStr = false, depth = 0;
+  for (let i = 0; i < col && i < line.length; i++) {
+    const c = line[i];
+    if (inStr) {
+      if (c === "\\") {
+        i++;
+        continue;
+      }
+      if (depth === 0 && (c === '"' || c === "\u201D")) inStr = false;
+      else if (c === "{") depth++;
+      else if (c === "}" && depth > 0) depth--;
+    } else {
+      if (c === '"' || c === "\u201C") {
+        inStr = true;
+        depth = 0;
+      } else if (c === "-" && line[i + 1] === "-") return "comment";
+    }
+  }
+  return inStr && depth === 0 ? "string" : "code";
+}
+function explain(src, line, col, syms) {
+  const text = src.split("\n")[line] ?? "";
+  let start = col, end = col;
+  while (start > 0 && /\w/.test(text[start - 1])) start--;
+  while (end < text.length && /\w/.test(text[end])) end++;
+  if (start === end || /^\d/.test(text.slice(start, end))) return null;
+  if (zone(text, start) !== "code") return null;
+  const word = text.slice(start, end);
+  const before = text.slice(0, start);
+  const after = text.slice(end);
+  const lead = /^\s*(\w+)/.exec(text)?.[1] ?? "";
+  const prevWord = /(\w+)\s*$/.exec(before)?.[1] ?? "";
+  const s = syms ?? symbols(src);
+  const out = (markdown) => ({ markdown, start, end });
+  if (/(['’]s|\.)\s*$/.test(before)) {
+    const p = PROPERTIES[word];
+    if (p) return out(formatDoc(p, "property"));
+    return out(fence(`${/(\w+)\s*(?:['’]s|\.)\s*$/.exec(before)?.[1] ?? "it"}'s ${word}`) + "\n\nA property set by the program, like `set ball's " + word + " to 0`.");
+  }
+  const fn = s.fns.get(word);
+  if (fn && !(STATEMENTS2[word] && lead === word)) {
+    const sig = `to ${fn.name}${fn.params.length ? " " + fn.params.join(" and ") : ""}`;
+    const use = `${fn.name}(${fn.params.join(", ")})`;
+    return out(`*your instructions, line ${fn.line + 1}*
+
+` + fence(sig) + (fn.comment ? "\n\n" + fn.comment : "") + "\n\nUse it like `" + use + "`.");
+  }
+  const owner = enclosingFn(src, line, s);
+  if (owner && owner.params.includes(word)) {
+    return out(`*input of \`${owner.name}\`*
+
+` + fence(`to ${owner.name} ${owner.params.join(" and ")}`) + `
+
+The value given to \`${owner.name}\` when it is used.`);
+  }
+  if (word === "to") {
+    if (lead === "to" && /^\s*$/.test(before)) return out(formatDoc(STATEMENTS2.to));
+    if (/\bset\b/.test(before)) return out(fence("set name to value") + "\n\nThe value to keep.");
+    if (/\brandom\b/.test(before)) return out(formatDoc(OPERATORS.random));
+    if (/\bfrom\b/.test(before) && lead === "draw") return out(fence("draw line from x, y to x, y") + "\n\nWhere the line ends.");
+    if (/\bfrom\b/.test(before)) return out(fence("for each n from a to b") + "\n\nThe last number counted (it is included).");
+    if (lead === "add") return out(formatDoc(STATEMENTS2.add));
+  }
+  if (word === "frame" && prevWord === "every") return out(formatDoc(STATEMENTS2.every));
+  const shapeLine = /^\s*(draw|set\s+.*\bto\s+new|new)\b/.test(text) || /\bnew\s+\w+/.test(before);
+  if (shapeLine && (prevWord === "draw" || prevWord === "new") && SHAPES2[word]) return out(formatDoc(SHAPES2[word], "shape"));
+  if (/^\s*(\(|of\b)/.test(after) && FUNCTIONS[word] && !s.vars.has(word)) return out(formatDoc(FUNCTIONS[word], "built-in instructions"));
+  if (shapeLine && SETTINGS[word] && /\bnew\b|\bdraw\b/.test(before)) return out(formatDoc(SETTINGS[word], "setting"));
+  if (/^\s*play\b/.test(text) && SETTINGS[word]) return out(formatDoc(SETTINGS[word], "setting"));
+  const v = s.vars.get(word);
+  if (v && !STATEMENTS2[word] && !OPERATORS[word]) {
+    return out(`*your name, first set on line ${v.line + 1}*
+
+` + fence(v.text));
+  }
+  if (STATEMENTS2[word]) return out(formatDoc(STATEMENTS2[word]));
+  if (OPERATORS[word]) return out(formatDoc(OPERATORS[word]));
+  if (GLOBALS[word]) return out(formatDoc(GLOBALS[word], "always there"));
+  if (FUNCTIONS[word]) return out(formatDoc(FUNCTIONS[word], "built-in instructions"));
+  if (SHAPES2[word]) return out(formatDoc(SHAPES2[word], "shape"));
+  if (SETTINGS[word]) return out(formatDoc(SETTINGS[word], "setting"));
+  return null;
+}
+function enclosingFn(src, line, s) {
+  const lines = src.split("\n");
+  const stack = [];
+  for (let i = 0; i <= line && i < lines.length; i++) {
+    const l = lines[i].replace(/--.*$/, "");
+    const m = /^\s*to\s+([A-Za-z_]\w*)/.exec(l);
+    if (m) stack.push("fn:" + m[1]);
+    else if (/^\s*(if\b(?!.*\bthen\s+\S)|repeat\b|for\b|every\b|when\b)/.test(l)) stack.push("block");
+    else if (/^\s*end\b/.test(l) && i < line) stack.pop();
+  }
+  const f = stack.find((x) => x.startsWith("fn:"));
+  return f ? s.fns.get(f.slice(3)) ?? null : null;
+}
+function signatureAt(src, line, col, syms) {
+  const text = (src.split("\n")[line] ?? "").slice(0, col);
+  let depth = 0, commas = 0;
+  for (let i = text.length - 1; i >= 0; i--) {
+    const c = text[i];
+    if (c === ")" || c === "]") depth++;
+    else if (c === "[") depth--;
+    else if (c === "(") {
+      if (depth > 0) {
+        depth--;
+        continue;
+      }
+      const name = /([A-Za-z_]\w*)\s*$/.exec(text.slice(0, i))?.[1];
+      if (!name) return null;
+      const s = syms ?? symbols(src);
+      const fn = s.fns.get(name);
+      if (fn) return { label: `${name}(${fn.params.join(", ")})`, params: fn.params, active: commas, doc: fn.comment || "Your instructions." };
+      const b = FUNCTIONS[name];
+      if (!b) return null;
+      const first = b.sig.split(" / ")[0];
+      const params = /\((.*)\)/.exec(first)?.[1].split(",").map((p) => p.trim()).filter(Boolean) ?? [];
+      return { label: first, params, active: commas, doc: b.doc };
+    } else if (c === "," && depth === 0) commas++;
+  }
+  return null;
+}
+var SNIPPETS = [
+  { label: "if", kind: "snippet", detail: "if ... end", doc: "Run steps only when something is true.", insert: "if ${1:condition}\n	$0\nend" },
+  { label: "if otherwise", kind: "snippet", detail: "if ... otherwise ... end", doc: "Choose between two paths.", insert: "if ${1:condition}\n	$2\notherwise\n	$0\nend" },
+  { label: "repeat times", kind: "snippet", detail: "repeat N times ... end", doc: "Repeat steps a number of times.", insert: "repeat ${1:3} times\n	$0\nend" },
+  { label: "repeat forever", kind: "snippet", detail: "repeat forever ... end", doc: "Repeat once per frame until the program ends.", insert: "repeat forever\n	$0\nend" },
+  { label: "for each in", kind: "snippet", detail: "for each item in list ... end", doc: "Go through a list.", insert: "for each ${1:item} in ${2:list}\n	$0\nend" },
+  { label: "for each from", kind: "snippet", detail: "for each n from 1 to 10 ... end", doc: "Count through numbers.", insert: "for each ${1:n} from ${2:1} to ${3:10}\n	$0\nend" },
+  { label: "to", kind: "snippet", detail: "to name inputs ... end", doc: "Define your own instructions.", insert: "to ${1:name} ${2:input}\n	$0\nend" },
+  { label: "every frame", kind: "snippet", detail: "every frame ... end", doc: "Run 60 times a second (animation).", insert: "every frame\n	$0\nend" },
+  { label: "every seconds", kind: "snippet", detail: "every N seconds ... end", doc: "Run on a clock.", insert: "every ${1:2} seconds\n	$0\nend" },
+  { label: "when key", kind: "snippet", detail: 'when key "space" is pressed ... end', doc: "React to a key.", insert: 'when key "${1:space}" is pressed\n	$0\nend' },
+  { label: "when mouse", kind: "snippet", detail: "when mouse is clicked ... end", doc: "React to a click.", insert: "when mouse is clicked\n	$0\nend" },
+  { label: "when touches", kind: "snippet", detail: "when a touches b ... end", doc: "React when two shapes meet.", insert: "when ${1:ball} touches ${2:edge}\n	$0\nend" },
+  { label: "draw circle", kind: "snippet", detail: "draw circle at x, y size s color c", doc: "Draw a circle.", insert: 'draw circle at ${1:240}, ${2:180} size ${3:40} color "${4:tomato}"' },
+  { label: "new circle", kind: "snippet", detail: "new circle that moves and bounces", doc: "A shape that moves by itself.", insert: "new circle at ${1:100}, ${2:100} size ${3:30} moving ${4:3}, ${5:0} bouncy" }
+];
+function completions(src, line, col, syms) {
+  const text = (src.split("\n")[line] ?? "").slice(0, col);
+  if (zone(text, text.length) !== "code") return [];
+  const s = syms ?? symbols(src);
+  const items = [];
+  if (/(['’]s|\.)\s*\w*$/.test(text)) {
+    for (const [k, w] of Object.entries(PROPERTIES)) items.push({ label: k, kind: "property", detail: w.sig, doc: w.doc });
+    return items;
+  }
+  const atStart = /^\s*\w*$/.test(text);
+  for (const f of s.fns.values()) items.push({ label: f.name, kind: "user-fn", detail: `to ${f.name} ${f.params.join(" and ")}`.trim(), doc: f.comment || "Your instructions.", insert: `${f.name}(${f.params.map((p, i) => `\${${i + 1}:${p}}`).join(", ")})` });
+  for (const v of s.vars.values()) items.push({ label: v.name, kind: "user-var", detail: v.text, doc: `First set on line ${v.line + 1}.` });
+  if (atStart) items.push(...SNIPPETS);
+  const tables = atStart ? [STATEMENTS2, OPERATORS, FUNCTIONS, GLOBALS] : [OPERATORS, FUNCTIONS, GLOBALS, SHAPES2, SETTINGS, STATEMENTS2];
+  const seen = new Set(items.map((i) => i.label));
+  for (const t of tables) {
+    for (const [k, w] of Object.entries(t)) {
+      if (seen.has(k)) continue;
+      seen.add(k);
+      items.push({ label: k, kind: w.kind, detail: w.sig, doc: w.doc, insert: w.kind === "function" ? `${k}($0)` : void 0 });
+    }
+  }
+  return items;
+}
+
 // src/vscode/extension.ts
 var output;
 var running = null;
@@ -1158,10 +1512,10 @@ function activate(ctx) {
     const sp = e.span ?? { line: 1, col: 1, len: 1 };
     const line = Math.min(doc.lineCount - 1, Math.max(0, sp.line - 1));
     const range = new vscode.Range(line, sp.col - 1, line, sp.col - 1 + Math.max(1, sp.len));
-    const d = new vscode.Diagnostic(range, e.message.replace(/`/g, "'") + (e.hint ? `
+    const d2 = new vscode.Diagnostic(range, e.message.replace(/`/g, "'") + (e.hint ? `
 Hint: ${e.hint.replace(/`/g, "'")}` : ""), vscode.DiagnosticSeverity.Error);
-    d.source = "once";
-    return d;
+    d2.source = "once";
+    return d2;
   };
   const check = (doc) => {
     if (doc.languageId !== "once") return;
@@ -1188,6 +1542,57 @@ Hint: ${e.hint.replace(/`/g, "'")}` : ""), vscode.DiagnosticSeverity.Error);
     })
   );
   vscode.workspace.textDocuments.forEach(check);
+  const KIND = {
+    statement: vscode.CompletionItemKind.Keyword,
+    keyword: vscode.CompletionItemKind.Keyword,
+    operator: vscode.CompletionItemKind.Operator,
+    shape: vscode.CompletionItemKind.Class,
+    setting: vscode.CompletionItemKind.Property,
+    function: vscode.CompletionItemKind.Function,
+    value: vscode.CompletionItemKind.Constant,
+    property: vscode.CompletionItemKind.Field,
+    "user-fn": vscode.CompletionItemKind.Method,
+    "user-var": vscode.CompletionItemKind.Variable,
+    snippet: vscode.CompletionItemKind.Snippet
+  };
+  const selector = { language: "once" };
+  ctx.subscriptions.push(
+    vscode.languages.registerHoverProvider(selector, {
+      provideHover(doc, pos) {
+        const r = explain(doc.getText(), pos.line, pos.character);
+        if (!r) return null;
+        const md = new vscode.MarkdownString(r.markdown);
+        return new vscode.Hover(md, new vscode.Range(pos.line, r.start, pos.line, r.end));
+      }
+    }),
+    vscode.languages.registerCompletionItemProvider(selector, {
+      provideCompletionItems(doc, pos) {
+        const src = doc.getText();
+        return completions(src, pos.line, pos.character, symbols(src)).map((c) => {
+          const item = new vscode.CompletionItem(c.label, KIND[c.kind] ?? vscode.CompletionItemKind.Text);
+          item.detail = c.detail;
+          item.documentation = new vscode.MarkdownString(c.doc);
+          if (c.insert) item.insertText = new vscode.SnippetString(c.insert);
+          if (c.kind === "snippet") item.sortText = "0" + c.label;
+          else if (c.kind.startsWith("user")) item.sortText = "1" + c.label;
+          return item;
+        });
+      }
+    }, "'", "."),
+    vscode.languages.registerSignatureHelpProvider(selector, {
+      provideSignatureHelp(doc, pos) {
+        const sig = signatureAt(doc.getText(), pos.line, pos.character);
+        if (!sig) return null;
+        const info = new vscode.SignatureInformation(sig.label, new vscode.MarkdownString(sig.doc));
+        info.parameters = sig.params.map((p) => new vscode.ParameterInformation(p));
+        const help = new vscode.SignatureHelp();
+        help.signatures = [info];
+        help.activeSignature = 0;
+        help.activeParameter = Math.min(sig.active, Math.max(0, sig.params.length - 1));
+        return help;
+      }
+    }, "(", ",")
+  );
   const current = async () => {
     const ed = vscode.window.activeTextEditor;
     const doc = ed?.document ?? (panelDoc ? await vscode.workspace.openTextDocument(panelDoc) : null);
@@ -1202,8 +1607,8 @@ Hint: ${e.hint.replace(/`/g, "'")}` : ""), vscode.DiagnosticSeverity.Error);
     running?.kill();
     const p = (0, import_node_child_process.spawn)(process.execPath, [cli, ...args], { env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } });
     running = p;
-    p.stdout.on("data", (d) => output.append(d.toString()));
-    p.stderr.on("data", (d) => output.append(d.toString()));
+    p.stdout.on("data", (d2) => output.append(d2.toString()));
+    p.stderr.on("data", (d2) => output.append(d2.toString()));
     p.on("close", (code) => {
       if (running === p) running = null;
       onDone?.(code);
@@ -1232,8 +1637,8 @@ Hint: ${e.hint.replace(/`/g, "'")}` : ""), vscode.DiagnosticSeverity.Error);
         panel.webview.onDidReceiveMessage(async (m) => {
           if (m.type === "ready" && panelDoc) sendCode(await vscode.workspace.openTextDocument(panelDoc));
           if (m.type === "error" && panelDoc) {
-            const d = await vscode.workspace.openTextDocument(panelDoc);
-            diags.set(panelDoc, [toDiag(Object.assign(new OnceError("runtime", m.message, m.span, m.hint)), d)]);
+            const d2 = await vscode.workspace.openTextDocument(panelDoc);
+            diags.set(panelDoc, [toDiag(Object.assign(new OnceError("runtime", m.message, m.span, m.hint)), d2)]);
           }
         });
       } else {

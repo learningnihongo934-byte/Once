@@ -2,7 +2,7 @@
   "name": "once-language",
   "displayName": "Once",
   "description": "Once language support: highlighting, live mistakes, a preview panel that runs your program, and run/export commands.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "learningnihongo934-byte",
   "license": "MIT",
   "engines": {

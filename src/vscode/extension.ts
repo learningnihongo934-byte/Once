@@ -6,6 +6,7 @@ import { deflateRawSync } from 'node:zlib';
 import * as vscode from 'vscode';
 import { OnceError } from '../errors';
 import { parse } from '../parser';
+import { completions, explain, signatureAt, symbols } from '../explain';
 
 let output: vscode.OutputChannel;
 let running: ChildProcess | null = null;
@@ -50,6 +51,54 @@ export function activate(ctx: vscode.ExtensionContext) {
     }),
   );
   vscode.workspace.textDocuments.forEach(check);
+
+  // Hover, autocomplete and input hints, like other languages have.
+  const KIND: Record<string, vscode.CompletionItemKind> = {
+    statement: vscode.CompletionItemKind.Keyword, keyword: vscode.CompletionItemKind.Keyword,
+    operator: vscode.CompletionItemKind.Operator, shape: vscode.CompletionItemKind.Class,
+    setting: vscode.CompletionItemKind.Property, function: vscode.CompletionItemKind.Function,
+    value: vscode.CompletionItemKind.Constant, property: vscode.CompletionItemKind.Field,
+    'user-fn': vscode.CompletionItemKind.Method, 'user-var': vscode.CompletionItemKind.Variable,
+    snippet: vscode.CompletionItemKind.Snippet,
+  };
+  const selector: vscode.DocumentSelector = { language: 'once' };
+  ctx.subscriptions.push(
+    vscode.languages.registerHoverProvider(selector, {
+      provideHover(doc, pos) {
+        const r = explain(doc.getText(), pos.line, pos.character);
+        if (!r) return null;
+        const md = new vscode.MarkdownString(r.markdown);
+        return new vscode.Hover(md, new vscode.Range(pos.line, r.start, pos.line, r.end));
+      },
+    }),
+    vscode.languages.registerCompletionItemProvider(selector, {
+      provideCompletionItems(doc, pos) {
+        const src = doc.getText();
+        return completions(src, pos.line, pos.character, symbols(src)).map((c) => {
+          const item = new vscode.CompletionItem(c.label, KIND[c.kind] ?? vscode.CompletionItemKind.Text);
+          item.detail = c.detail;
+          item.documentation = new vscode.MarkdownString(c.doc);
+          if (c.insert) item.insertText = new vscode.SnippetString(c.insert);
+          if (c.kind === 'snippet') item.sortText = '0' + c.label;
+          else if (c.kind.startsWith('user')) item.sortText = '1' + c.label;
+          return item;
+        });
+      },
+    }, "'", '.'),
+    vscode.languages.registerSignatureHelpProvider(selector, {
+      provideSignatureHelp(doc, pos) {
+        const sig = signatureAt(doc.getText(), pos.line, pos.character);
+        if (!sig) return null;
+        const info = new vscode.SignatureInformation(sig.label, new vscode.MarkdownString(sig.doc));
+        info.parameters = sig.params.map((p) => new vscode.ParameterInformation(p));
+        const help = new vscode.SignatureHelp();
+        help.signatures = [info];
+        help.activeSignature = 0;
+        help.activeParameter = Math.min(sig.active, Math.max(0, sig.params.length - 1));
+        return help;
+      },
+    }, '(', ','),
+  );
 
   const current = async (): Promise<vscode.TextDocument | null> => {
     const ed = vscode.window.activeTextEditor;

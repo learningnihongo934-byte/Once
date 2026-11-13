@@ -67,7 +67,7 @@ Needs Node 18 or newer.
 
 ## VS Code
 
-`./build.sh install` installs the extension. Open any `.once` file to get highlighting and mistakes underlined as you type. Press the play button in the editor title (or Cmd/Ctrl + Enter) to run the program in a preview panel with drawing, sound and keys; saving re-runs it. The command palette also has **Once: Run in Output**, **Once: Export as Web Page** and **Once: Open in Web Playground**.
+`./build.sh install` installs the extension. Open any `.once` file to get highlighting, mistakes underlined as you type, hover explanations for every word (with examples), autocomplete and input hints. Press the play button in the editor title (or Cmd/Ctrl + Enter) to run the program in a preview panel with drawing, sound and keys; saving re-runs it. The command palette also has **Once: Run in Output**, **Once: Export as Web Page** and **Once: Open in Web Playground**.
 
 ## The `once` command
 
