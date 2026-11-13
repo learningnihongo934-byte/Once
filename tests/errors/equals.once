@@ -1,0 +1,2 @@
+-- error: start the line with `set`
+x = 5

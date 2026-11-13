@@ -1,0 +1,5 @@
+-- error: never stops
+to loop n
+  give back loop(n + 1)
+end
+say loop(1)

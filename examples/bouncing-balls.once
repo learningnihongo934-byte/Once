@@ -1,0 +1,24 @@
+-- Bouncing balls
+-- Click the preview to drop in another one.
+
+set gravity to 0.3
+set colors to ["#e5484d", "#f5a524", "#30a46c", "#0078d4", "#8e4ec6"]
+set balls to []
+
+to drop x and y
+  set ball to new circle at x, y size random 24 to 48 color any of colors moving random -3 to 3, 0 bouncy 0.85 solid
+  add ball to balls
+end
+
+repeat 10 times
+  drop(random 40 to 440, random 30 to 160)
+end
+
+when mouse is clicked
+  drop(mouse's x, mouse's y)
+  play sound "pop"
+end
+
+every frame
+  draw text "{length of balls} balls" at 14, 10 size 22
+end

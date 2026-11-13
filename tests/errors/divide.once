@@ -1,0 +1,2 @@
+-- error: divide by zero
+say 1 / 0

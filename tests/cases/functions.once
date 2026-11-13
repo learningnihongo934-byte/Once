@@ -1,0 +1,25 @@
+to plus a and b
+  give back a + b
+end
+to fact n
+  if n is at most 1 then give back 1
+  give back n * fact(n - 1)
+end
+to hello
+  say "hello from inside"
+end
+say plus(2, 3)
+say fact(10)
+hello()
+say sqrt of 16
+say round(3.14159, 2)
+say max(3, 9, 2)
+say min([4, 2, 8])
+say abs(-3)
+say sin(90)
+say cos(180)
+say text(5) + "!"
+say number("12") + 1
+say upper("loud")
+say clamp(15, 0, 10)
+say distance(0, 0, 3, 4)

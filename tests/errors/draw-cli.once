@@ -1,0 +1,2 @@
+-- error: Drawing needs a picture
+draw circle at 1, 2

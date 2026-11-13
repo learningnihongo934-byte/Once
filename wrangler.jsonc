@@ -1,0 +1,9 @@
+{
+  // Once: static playground + Book, served from dist/web (./build.sh deploy)
+  "name": "once",
+  "compatibility_date": "2025-10-01",
+  "assets": { "directory": "dist/web" },
+  // once.rennko.tech/* is more specific than Rennko Cloud's *.rennko.tech/* route, so this host stays here
+  "routes": [{ "pattern": "once.rennko.tech", "custom_domain": true }, { "pattern": "once.rennko.tech/*", "zone_name": "rennko.tech" }],
+  "workers_dev": true
+}

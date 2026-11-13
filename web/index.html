@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Once Playground</title>
+<meta name="description" content="Once is a small programming language that reads like English. Write a few lines and shapes move, bounce, make sounds and listen to the keyboard. Runs in your browser.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230078d4'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='white' stroke-width='3.5'/%3E%3C/svg%3E">
+<script>try{var t=localStorage.getItem('once:theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="app">
+<header class="titlebar">
+  <a class="logo" href="./"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="6" fill="#0078d4"/><circle cx="16" cy="16" r="8" fill="none" stroke="#fff" stroke-width="3.5"/></svg>Once</a>
+  <div class="actions">
+    <button id="run" class="btn primary" title="Run (Ctrl/Cmd + Enter)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>Run</button>
+    <button id="stop" class="btn" title="Stop" disabled><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1" fill="currentColor"/></svg>Stop</button>
+    <select id="stories" aria-label="Open an example"></select>
+  </div>
+  <div class="actions right">
+    <button id="share" class="btn ghost" title="Copy a link to this code">Share</button>
+    <button id="export" class="btn ghost" title="Download a web page that plays this program">Export HTML</button>
+    <a class="btn ghost" href="docs.html">Docs</a>
+    <a class="btn ghost hide-sm" href="https://github.com/learningnihongo934-byte/Once">GitHub</a>
+    <button id="theme" class="btn ghost icon" title="Switch light / dark" aria-label="Switch light or dark theme"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13z" fill="currentColor"/><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></button>
+  </div>
+</header>
+
+<main class="workbench">
+  <section class="editor-group" aria-label="Editor">
+    <div class="tabs"><div class="tab active"><span class="file-icon" aria-hidden="true">O</span><span id="filename">bouncing-balls.once</span></div></div>
+    <div class="editor" id="editor">
+      <div class="gutter" id="gutter" aria-hidden="true">1</div>
+      <div class="code">
+        <div class="curline" id="curline"></div>
+        <div class="errline" id="errline"></div>
+        <pre class="hl" id="hl" aria-hidden="true"></pre>
+        <div class="squiggle" id="squiggle"></div>
+        <textarea id="src" wrap="off" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="Code"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <section class="side" aria-label="Preview and output">
+    <div class="pane-head"><span>Preview</span><span class="muted">480 &times; 360 &middot; click it to use the keyboard</span></div>
+    <div class="preview">
+      <div class="stage" id="stagebox" tabindex="0" aria-label="Preview. Click it, then use the keyboard."><canvas id="stage"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-tabs" role="tablist">
+        <button role="tab" id="tab-output" class="ptab active" aria-selected="true">Output</button>
+        <button role="tab" id="tab-problems" class="ptab" aria-selected="false">Problems <span class="badge" id="pcount" hidden>1</span></button>
+        <span class="grow"></span>
+        <button class="btn ghost icon" id="clear-output" title="Clear output" aria-label="Clear output"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M6 4V2.5h4V4M4.5 4l.7 9.5h5.6l.7-9.5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></button>
+      </div>
+      <div class="panel-body" id="output" aria-live="polite"></div>
+      <div class="panel-body" id="problems" hidden></div>
+    </div>
+  </section>
+</main>
+
+<footer class="statusbar">
+  <span class="item" id="status"><span class="dot"></span>Ready</span>
+  <span class="item" id="errcount">0 problems</span>
+  <span class="grow"></span>
+  <span class="item" id="cursor">Ln 1, Col 1</span>
+  <span class="item hide-sm">Spaces: 2</span>
+  <span class="item hide-sm">Once 0.1</span>
+</footer>
+<script src="playground.js"></script>
+</body>
+</html>

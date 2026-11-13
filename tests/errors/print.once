@@ -1,0 +1,2 @@
+-- error: Write `say` instead
+print("hi")

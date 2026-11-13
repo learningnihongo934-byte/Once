@@ -1,0 +1,4 @@
+-- error: is never closed with `end`
+-- line: 3
+if 1 is 1
+  say "x"

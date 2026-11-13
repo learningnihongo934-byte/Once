@@ -1,0 +1,120 @@
+{
+  "name": "once-language",
+  "displayName": "Once",
+  "description": "Once language support: highlighting, live mistakes, a preview panel that runs your program, and run/export commands.",
+  "version": "0.1.0",
+  "publisher": "learningnihongo934-byte",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "once",
+        "aliases": [
+          "Once",
+          "once"
+        ],
+        "extensions": [
+          ".once"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "once",
+        "scopeName": "source.once",
+        "path": "./syntaxes/once.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "once.preview",
+        "title": "Run in Preview",
+        "category": "Once",
+        "icon": "$(play)"
+      },
+      {
+        "command": "once.runInTerminal",
+        "title": "Run in Output (no drawing)",
+        "category": "Once"
+      },
+      {
+        "command": "once.stop",
+        "title": "Stop",
+        "category": "Once",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "once.export",
+        "title": "Export as Web Page",
+        "category": "Once"
+      },
+      {
+        "command": "once.openPlayground",
+        "title": "Open in Web Playground",
+        "category": "Once"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "once.preview",
+          "when": "resourceLangId == once",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "once.preview",
+          "when": "resourceLangId == once",
+          "group": "once@1"
+        },
+        {
+          "command": "once.export",
+          "when": "resourceLangId == once",
+          "group": "once@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "once.preview",
+          "when": "editorLangId == once || activeWebviewPanelId == oncePreview"
+        },
+        {
+          "command": "once.runInTerminal",
+          "when": "editorLangId == once || activeWebviewPanelId == oncePreview"
+        },
+        {
+          "command": "once.export",
+          "when": "editorLangId == once || activeWebviewPanelId == oncePreview"
+        },
+        {
+          "command": "once.openPlayground",
+          "when": "editorLangId == once || activeWebviewPanelId == oncePreview"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "once.preview",
+        "key": "ctrl+enter",
+        "mac": "cmd+enter",
+        "when": "editorLangId == once && editorTextFocus"
+      }
+    ]
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:once"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/learningnihongo934-byte/Once"
+  }
+}

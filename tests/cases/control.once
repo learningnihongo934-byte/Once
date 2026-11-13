@@ -1,0 +1,32 @@
+set n to 7
+if n is above 10
+  say "big"
+otherwise if n is above 5
+  say "medium"
+otherwise
+  say "small"
+end
+if n is 7 then say "seven"
+repeat 3 times
+  say "knock"
+end
+for each i from 1 to 10
+  if i is 2 then skip
+  if i is 5 then stop
+  say i
+end
+for each i from 6 to 0 by -3
+  say i
+end
+set total to 0
+repeat while total is below 10
+  change total by 4
+end
+say total
+repeat until total is 0
+  change total by -4
+end
+say total
+for each c in "abc"
+  say c
+end

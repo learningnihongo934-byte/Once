@@ -1,0 +1,2 @@
+-- error: I don't know the note "H2"
+play note "H2"

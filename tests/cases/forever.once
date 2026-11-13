@@ -1,0 +1,9 @@
+set n to 0
+repeat forever
+  change n by 1
+  if n is 3
+    say "three frames"
+    stop
+  end
+end
+say "after"

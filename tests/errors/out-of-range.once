@@ -1,0 +1,2 @@
+-- error: the list only has 2 items
+say item 3 of [1, 2]

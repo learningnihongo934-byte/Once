@@ -1,0 +1,2 @@
+-- error: missing its closing quote
+say "hello

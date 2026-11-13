@@ -1,0 +1,2 @@
+-- error: only works inside a repeat
+stop

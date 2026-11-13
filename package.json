@@ -1,0 +1,24 @@
+{
+  "name": "once-lang",
+  "version": "0.1.0",
+  "description": "Once: a little programming language for moving pictures, that reads like English.",
+  "license": "MIT",
+  "bin": {
+    "once": "bin/once"
+  },
+  "files": [
+    "bin",
+    "dist/once.cjs",
+    "dist/web/once-web.js"
+  ],
+  "scripts": {
+    "build": "./build.sh",
+    "test": "./build.sh test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/vscode": "^1.80.0",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.6.3"
+  }
+}

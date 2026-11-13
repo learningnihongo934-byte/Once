@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Once Docs</title>
+<meta name="description" content="Learn Once, a programming language that reads like English, in ten short chapters: saying things, keeping values, choosing, repeating, drawing, moving shapes, keys, sounds and time.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230078d4'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='white' stroke-width='3.5'/%3E%3C/svg%3E">
+<meta name="color-scheme" content="light dark">
+<script>try{var t=localStorage.getItem('once:theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="docs-page">
+<header class="titlebar">
+  <a class="logo" href="./"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="6" fill="#0078d4"/><circle cx="16" cy="16" r="8" fill="none" stroke="#fff" stroke-width="3.5"/></svg>Once</a>
+  <div class="actions"><a class="btn ghost" href="./">Playground</a><a class="btn ghost" href="docs.html" aria-current="page">Docs</a></div>
+  <div class="actions right">
+    <a class="btn ghost" href="https://github.com/learningnihongo934-byte/Once">GitHub</a>
+    <button id="theme" class="btn ghost icon" title="Switch light / dark" aria-label="Switch light or dark theme"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13z" fill="currentColor"/><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></button>
+  </div>
+</header>
+<div class="docs">
+  <nav class="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#saying">Saying things</a></li>
+      <li><a href="#keeping">Keeping things</a></li>
+      <li><a href="#choosing">Choosing</a></li>
+      <li><a href="#again">Again and again</a></li>
+      <li><a href="#instructions">Your own instructions</a></li>
+      <li><a href="#drawing">Drawing</a></li>
+      <li><a href="#moving">Things that move</a></li>
+      <li><a href="#listening">Listening</a></li>
+      <li><a href="#sounds">Sounds</a></li>
+      <li><a href="#time">Time, and the end</a></li>
+      <li><a href="#appendix">Reference</a></li>
+    </ol>
+  </nav>
+<article class="doc">
+  <h1>Once documentation</h1>
+  <p class="sub">Everything in the language, with examples you can run. Press <b>Run</b> on any example to open it in the playground.</p>
+
+  <section class="chapter" id="saying">
+    <h2>1. Saying things</h2>
+    <p>A Once program is a list of steps, one per line, run from the top. The simplest step is <code>say</code>, which prints a line to the Output panel. Text goes inside double quotes.</p>
+    <div class="listing"><pre class="once">say "Once upon a time, there was a program."
+say 2 + 3</pre></div>
+    <p>Anything after <code>--</code> is a note for people, and Once skips it. Inside text, a name in curly braces is replaced by its value.</p>
+    <div class="listing"><pre class="once">-- This line is only for you.
+set name to "Pip"
+say "Hello, {name}! Two and two make {2 + 2}."</pre></div>
+  </section>
+
+  <section class="chapter" id="keeping">
+    <h2>2. Keeping things</h2>
+    <p>To keep a value, give it a name with <code>set</code>. To add to a number, use <code>change ... by</code>. Numbers, text, <code>true</code>, <code>false</code> and <code>nothing</code> are the plain kinds of value.</p>
+    <div class="listing"><pre class="once">set score to 0
+change score by 10
+change score by -3
+say "The score is {score}."</pre></div>
+    <h3>Lists</h3>
+    <p>A list holds several values in square brackets. Lists count from one, so <code>item 1 of</code> a list is the first thing in it.</p>
+    <div class="listing"><pre class="once">set pets to ["cat", "owl", "toad"]
+add "fox" to pets
+remove "owl" from pets
+say item 1 of pets
+say "There are {length of pets} pets: {join(pets, ", ")}."
+say any of pets</pre></div>
+    <p><code>any of</code> picks one at random. You can also write <code>pets[2]</code> for the second item.</p>
+    <h3>Records</h3>
+    <p>A record is a small bundle of named values. Read one with <code>'s</code>, as in English.</p>
+    <div class="listing"><pre class="once">set hero to {name: "Mo", hearts: 3}
+change hero's hearts by -1
+say "{hero's name} has {hero's hearts} hearts left."</pre></div>
+  </section>
+
+  <section class="chapter" id="choosing">
+    <h2>3. Choosing</h2>
+    <p>An <code>if</code> does its steps only when something is true. <code>otherwise</code> gives the other path, and every block ends with <code>end</code>.</p>
+    <div class="listing"><pre class="once">set apples to random 1 to 10
+
+if apples is 10
+  say "A perfect ten!"
+otherwise if apples is above 5
+  say "Plenty of apples ({apples})."
+otherwise
+  say "Only {apples}. Time to pick more."
+end</pre></div>
+    <p>You can compare with <code>is</code>, <code>is not</code>, <code>is above</code>, <code>is below</code>, <code>is at least</code> and <code>is at most</code>, or with the signs <code>=</code>, <code>!=</code>, <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code> and <code>&gt;=</code>. Join conditions with <code>and</code>, <code>or</code> and <code>not</code>. A one-step <code>if</code> can sit on one line with <code>then</code>, and needs no <code>end</code>.</p>
+    <div class="listing"><pre class="once">set hour to 21
+if hour is at least 20 and not (hour is 23) then say "Nearly bedtime."</pre></div>
+  </section>
+
+  <section class="chapter" id="again">
+    <h2>4. Again and again</h2>
+    <p>There are a few ways to repeat steps.</p>
+    <div class="listing"><pre class="once">repeat 3 times
+  say "Knock."
+end
+
+for each n from 1 to 5
+  say "{n} little ducks"
+end
+
+for each pet in ["cat", "owl"]
+  say "Goodnight, {pet}."
+end
+
+set x to 1
+repeat until x is above 100
+  set x to x * 2
+end
+say x</pre></div>
+    <p>Inside a loop, <code>stop</code> leaves the loop early and <code>skip</code> jumps to the next turn. Counting can go in steps: <code>for each n from 10 to 0 by -2</code>.</p>
+    <p><code>repeat forever</code> runs its steps once per frame, about sixty times a second, until the program ends. It never freezes the page.</p>
+  </section>
+
+  <section class="chapter" id="instructions">
+    <h2>5. Your own instructions</h2>
+    <p>Teach Once a new word with <code>to</code>. List its inputs after the name, joined by <code>and</code>. Use it by writing its name with the values in brackets. <code>give back</code> hands a value back.</p>
+    <div class="listing"><pre class="once">to greet who
+  say "Good morning, {who}."
+end
+
+to area width and tall
+  give back width * tall
+end
+
+greet("Pip")
+say "A 3 by 4 rug covers {area(3, 4)} squares."</pre></div>
+    <p>Instructions can call themselves, which is handy for counting down:</p>
+    <div class="listing"><pre class="once">to countdown n
+  if n is 0
+    say "Lift off!"
+  otherwise
+    say n
+    countdown(n - 1)
+  end
+end
+
+countdown(3)</pre></div>
+    <p>Once has some built-in instructions too, like <code>sqrt</code>, <code>round</code> and <code>length</code>. They are all in the <a href="#appendix">appendix</a>. An instruction with one input can be written with <code>of</code>: <code>length of pets</code> is the same as <code>length(pets)</code>.</p>
+  </section>
+
+  <section class="chapter" id="drawing">
+    <h2>6. Drawing</h2>
+    <p>The preview is 480 wide and 360 tall. The point <code>0, 0</code> is the top left corner, and <code>y</code> grows downward. You draw with <code>draw</code>, the name of a shape, and a few settings in any order.</p>
+    <div class="listing"><pre class="once">background "#f4e9d2"
+draw box at 240, 300 size 480, 120 color "#5f8a55"
+draw circle at 380, 80 size 70 color "#d39b2a"
+draw line from 120, 250 to 120, 170 color "#2a2118" width 6
+draw circle at 120, 150 size 90 color "#3f6788"
+draw text "A tree and a sun" at 16, 14 size 26</pre></div>
+    <table>
+      <tr><th>Shape</th><th>Settings</th></tr>
+      <tr><td><code>circle</code></td><td><code>at x, y</code> (its middle), <code>size</code> (across), <code>color</code>, <code>outline</code></td></tr>
+      <tr><td><code>box</code></td><td><code>at x, y</code> (its middle), <code>size w, h</code>, <code>width</code>, <code>height</code>, <code>color</code>, <code>outline</code>, <code>angle</code></td></tr>
+      <tr><td><code>line</code></td><td><code>from x, y</code>, <code>to x, y</code>, <code>color</code>, <code>width</code></td></tr>
+      <tr><td><code>text</code></td><td><code>at x, y</code> (its top left), <code>size</code>, <code>color</code></td></tr>
+    </table>
+    <p>Colors are text: names like <code>"tomato"</code> and <code>"skyblue"</code>, codes like <code>"#3f6788"</code>, or <code>rgb(255, 120, 0)</code> and <code>hsl(200, 60, 50)</code>. Things you draw stay on the page until you <code>clear</code> it.</p>
+    <h3>Every frame</h3>
+    <p>To animate, put your drawing inside <code>every frame</code>. Its drawings are wiped and redrawn sixty times a second, so they can move.</p>
+    <div class="listing"><pre class="once">set x to 0
+
+every frame
+  change x by 3
+  if x is above 520 then set x to -40
+  draw circle at x, 180 + sin(x * 2) * 40 size 40 color "#b5452f"
+end</pre></div>
+  </section>
+
+  <section class="chapter" id="moving">
+    <h2>7. Things that move</h2>
+    <p>A shape made with <code>new</code> stays on screen by itself. You can keep it in a name, read its settings with <code>'s</code>, and change them while the program runs. It also understands a few more settings:</p>
+    <table>
+      <tr><th>Setting</th><th>What it does</th></tr>
+      <tr><td><code>moving dx, dy</code></td><td>Moves it this far across and down every frame.</td></tr>
+      <tr><td><code>bouncy</code></td><td>Bounces off the edges of the preview. <code>bouncy 0.8</code> loses a little speed each bounce.</td></tr>
+      <tr><td><code>solid</code></td><td>Bumps into other solid shapes instead of passing through.</td></tr>
+      <tr><td><code>fixed</code></td><td>Never moves by itself (good for walls and paddles).</td></tr>
+      <tr><td><code>hidden</code></td><td>Starts out hidden. Use <code>show</code> and <code>hide</code> later.</td></tr>
+    </table>
+    <div class="listing"><pre class="once">set gravity to 0.4
+set ball to new circle at 100, 60 size 40 color "#b5452f" moving 3, 0 bouncy 0.9 solid
+new box at 300, 260 size 160, 24 color "#2a2118" fixed solid
+
+every frame
+  draw text "x is {round(ball's x)}" at 12, 10 size 20
+end</pre></div>
+    <p>Setting <code>gravity</code> pulls every shape that isn't fixed. A shape's settings are <code>x</code>, <code>y</code>, <code>dx</code>, <code>dy</code>, <code>size</code>, <code>width</code>, <code>height</code>, <code>color</code>, <code>bouncy</code>, <code>solid</code>, <code>fixed</code>, <code>hidden</code>, <code>angle</code> and, for text, <code>text</code>. You can also give it settings of your own, like <code>set ball's points to 5</code>. <code>remove ball</code> takes it off the screen.</p>
+    <p>To ask whether two shapes overlap, use <code>touches</code>. The word <code>edge</code> means the border of the preview.</p>
+    <div class="listing"><pre class="once">set coin to new circle at 400, 180 size 26 color "gold" fixed
+set bug to new box at 40, 180 size 30 color "#5f8a55" moving 2, 0
+
+every frame
+  if bug touches coin
+    remove coin
+    set bug's dx to 0
+    draw text "Got it!" at 190, 100 size 32
+  end
+end</pre></div>
+  </section>
+
+  <section class="chapter" id="listening">
+    <h2>8. Listening</h2>
+    <p>A <code>when</code> block waits for something to happen, then runs its steps. Click the preview first so it gets keyboard input.</p>
+    <div class="listing"><pre class="once">set hero to new box at 240, 300 size 40 color "#3f6788" bouncy 0
+
+when key "space" is pressed
+  set hero's dy to -9
+end
+
+when mouse is clicked
+  new circle at mouse's x, mouse's y size 16 color "tomato"
+end
+
+set gravity to 0.5
+
+every frame
+  if holding "left" then change hero's x by -4
+  if holding "right" then change hero's x by 4
+end</pre></div>
+    <p><code>holding "left"</code> is true for as long as the key is down. Keys are named <code>"left"</code>, <code>"right"</code>, <code>"up"</code>, <code>"down"</code>, <code>"space"</code>, <code>"enter"</code>, or a letter like <code>"a"</code>. The mouse is <code>mouse's x</code>, <code>mouse's y</code> and <code>mouse's down</code>.</p>
+    <p>You can also listen for shapes meeting. It happens once, at the moment they first touch.</p>
+    <div class="listing"><pre class="once">set ball to new circle at 60, 60 size 30 moving 4, 3 bouncy
+set wall to new box at 400, 180 size 20, 360 color "#2a2118" fixed
+
+when ball touches edge
+  play sound "click"
+end
+
+when ball touches wall
+  set ball's dx to -4
+  play sound "boop"
+end</pre></div>
+  </section>
+
+  <section class="chapter" id="sounds">
+    <h2>9. Sounds</h2>
+    <p><code>play note</code> plays a musical note by name, like <code>"C4"</code> (middle C), <code>"F#5"</code> or <code>"Bb3"</code>. Add <code>for</code> to set how long it lasts in seconds, <code>wave</code> to change its voice (<code>"triangle"</code>, <code>"sine"</code>, <code>"square"</code> or <code>"sawtooth"</code>), and <code>volume</code> from 0 to 1.</p>
+    <div class="listing"><pre class="once">for each n in ["C4", "E4", "G4", "C5"]
+  play note n for 0.3
+  wait 0.25 seconds
+end
+play note "C3" for 1 wave "sawtooth" volume 0.3</pre></div>
+    <p><code>play sound</code> plays one of the ready-made sounds: <code>"beep"</code>, <code>"boop"</code>, <code>"coin"</code>, <code>"jump"</code>, <code>"pop"</code>, <code>"hit"</code>, <code>"boom"</code> and <code>"click"</code>.</p>
+  </section>
+
+  <section class="chapter" id="time">
+    <h2>10. Time, and the end</h2>
+    <p><code>wait</code> pauses for some seconds, while everything else keeps running. <code>every 2 seconds</code> repeats its steps on a clock. <code>time</code> is the seconds since the program started, and <code>frame</code> counts the frames.</p>
+    <div class="listing"><pre class="once">say "Ready..."
+wait 1 seconds
+say "Steady..."
+wait 1 seconds
+say "Go!"
+
+every 0.5 seconds
+  new circle at random 20 to 460, 0 size 14 color "skyblue" moving 0, 3
+end
+
+every frame
+  draw text "{round(time, 1)} seconds" at 12, 10 size 20
+end</pre></div>
+    <p>To end the program, write <code>the end</code>. Everything stops.</p>
+    <div class="listing"><pre class="once">set hits to 0
+set ball to new circle at 240, 60 size 30 moving 5, 4 bouncy
+
+when ball touches edge
+  change hits by 1
+  play note 60 + hits
+  if hits is 8 then the end
+end</pre></div>
+  </section>
+
+  <section class="chapter" id="appendix">
+    <h2>Reference: built-in instructions</h2>
+    <p>Angles are in degrees. Lists count from one.</p>
+    <table>
+      <tr><th>Instruction</th><th>Gives back</th></tr>
+      <tr><td><code>sqrt(x)</code>, <code>abs(x)</code></td><td>The square root, or the number without its minus sign.</td></tr>
+      <tr><td><code>round(x)</code>, <code>round(x, 2)</code>, <code>floor(x)</code>, <code>ceil(x)</code></td><td>Rounded, to some places, down, or up.</td></tr>
+      <tr><td><code>sin(d)</code>, <code>cos(d)</code>, <code>tan(d)</code>, <code>angle(dx, dy)</code></td><td>Trigonometry in degrees, and the angle of a direction.</td></tr>
+      <tr><td><code>min(...)</code>, <code>max(...)</code>, <code>sum(list)</code>, <code>clamp(x, low, high)</code></td><td>The smallest, largest, total, or x kept between two numbers.</td></tr>
+      <tr><td><code>distance(a, b)</code>, <code>distance(x1, y1, x2, y2)</code></td><td>How far apart two shapes or points are.</td></tr>
+      <tr><td><code>text(x)</code>, <code>number(x)</code></td><td>A value as text, or text as a number.</td></tr>
+      <tr><td><code>length(x)</code>, <code>upper(t)</code>, <code>lower(t)</code></td><td>How long a list or text is; text in capitals or small letters.</td></tr>
+      <tr><td><code>join(list, sep)</code>, <code>split(t, sep)</code></td><td>A list glued into text, or text cut into a list.</td></tr>
+      <tr><td><code>range(a, b)</code>, <code>sort(list)</code>, <code>reverse(list)</code>, <code>find(list, x)</code></td><td>A list of numbers; sorted; backwards; where x is (0 if missing).</td></tr>
+      <tr><td><code>keys(record)</code></td><td>The names inside a record.</td></tr>
+      <tr><td><code>rgb(r, g, b)</code>, <code>hsl(h, s, l)</code></td><td>A color made from numbers.</td></tr>
+    </table>
+    <h3>Names that are always there</h3>
+    <p><code>width</code> and <code>height</code> of the preview, <code>mouse</code>, <code>edge</code>, <code>gravity</code>, <code>time</code>, <code>frame</code> and <code>pi</code>.</p>
+    <h3>When something goes wrong</h3>
+    <p>Once explains mistakes in plain words. It shows the line, underlines the part it got stuck on, and often guesses what you meant:</p>
+    <div class="listing"><pre class="once">set score to 0
+say scroe</pre></div>
+    <p>Run the example above to see the problem it reports.</p>
+    <h3>On the command line</h3>
+    <p>Programs are saved as <code>.once</code> files. With Node installed, the <code>once</code> command runs them in a terminal (everything except drawing and sound), checks them for mistakes, or turns one into a single web page you can share. To install it, and the VS Code extension, see the README.</p>
+    <div class="listing"><pre>once run main.once
+once check main.once
+once export main.once -o main.html</pre></div>
+      </section>
+</article>
+</div>
+<footer class="site-foot">Once is free and open source. Made by Virat Reddy Kaukuntla</footer>
+<script src="docs.js"></script>
+</body>
+</html>

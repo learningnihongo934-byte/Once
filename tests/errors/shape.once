@@ -1,0 +1,3 @@
+-- error: I don't know how to draw a `circel`
+-- hint: Did you mean `circle`?
+draw circel at 1, 2

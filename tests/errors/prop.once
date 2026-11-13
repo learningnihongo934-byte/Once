@@ -1,0 +1,4 @@
+-- error: doesn't have a `sise`
+-- hint: Did you mean `size`?
+set b to new circle at 1, 1
+say b's sise

@@ -1,0 +1,13 @@
+set count to 0
+to bump
+  change count by 1
+  set temp to 99
+end
+bump()
+bump()
+say count
+to shadow count
+  give back count * 10
+end
+say shadow(4)
+say count

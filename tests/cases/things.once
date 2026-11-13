@@ -1,0 +1,14 @@
+set ball to new circle at 100, 50 size 20 moving 2, 0
+set wall to new box at 200, 50 size 10, 100 fixed solid
+say ball's x
+say ball's size
+say ball touches wall
+set ball's points to 3
+say ball's points
+set hits to 0
+when ball touches wall
+  change hits by 1
+  say "bump at frame {frame}"
+  set ball's dx to 0
+  the end
+end

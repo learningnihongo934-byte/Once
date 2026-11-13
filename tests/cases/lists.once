@@ -1,0 +1,27 @@
+set xs to [3, 1, 2]
+add 5 to xs
+say xs
+say length of xs
+say item 1 of xs
+say xs[-1]
+say xs's last
+set xs[2] to 10
+say xs
+remove 10 from xs
+say xs
+say xs contains 3
+say sort(xs)
+say reverse([1, 2, 3])
+say join(["a", "b"], "-")
+say split("a b c", " ")
+say range(1, 4)
+say sum([1, 2, 3])
+say find(["x", "y"], "y")
+say [1] + [2]
+set r to {name: "Mo", hp: 3}
+change r's hp by -1
+say r
+say r's name
+set r's mood to "glad"
+say keys(r)
+say r["hp"]

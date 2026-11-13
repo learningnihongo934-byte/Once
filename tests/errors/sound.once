@@ -1,0 +1,3 @@
+-- error: I don't know the sound "bep"
+-- hint: Did you mean "beep"?
+play sound "bep"

@@ -1,0 +1,5 @@
+-- error: I don't know what `scroe` is
+-- hint: Did you mean `score`?
+-- line: 5
+set score to 1
+say scroe

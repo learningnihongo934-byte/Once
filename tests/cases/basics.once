@@ -1,0 +1,14 @@
+say "hello"
+say 1 + 2 * 3
+say (1 + 2) * 3
+say 7 / 2
+say 7 mod 3
+say -7 mod 3
+say 2 ^ 10
+say 0.1 + 0.2
+say "a" + 1
+set name to "Pip"
+say "hi {name}, {1 + 1}!"
+say "braces: \{ok\}"
+say true and not false
+say nothing

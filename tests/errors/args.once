@@ -1,0 +1,5 @@
+-- error: needs 2 inputs (a, b), but got 1
+to plus a and b
+  give back a + b
+end
+say plus(1)

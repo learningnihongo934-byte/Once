@@ -1,0 +1,6 @@
+-- error: has to stand on its own
+if true
+  every frame
+    say 1
+  end
+end

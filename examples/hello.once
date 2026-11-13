@@ -1,0 +1,18 @@
+-- Hello, world
+-- Press Run, then look at the Output panel.
+
+say "Once upon a time, there was a program."
+
+set name to "Pip"
+set age to 3
+say "Its name was {name}, and it was {age} years old."
+
+for each n from 1 to 3
+  say "It counted to {n}."
+end
+
+to double x
+  give back x * 2
+end
+
+say "Twice its age is {double(age)}."

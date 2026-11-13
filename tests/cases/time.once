@@ -1,0 +1,9 @@
+say "one"
+wait 0.1 seconds
+say "two"
+set ticks to 0
+every 0.25 seconds
+  change ticks by 1
+  say "tick {ticks}"
+  if ticks is 3 then the end
+end
