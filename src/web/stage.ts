@@ -128,6 +128,13 @@ export class Stage {
         ticks++;
       }
       this.render();
+      // A program with nothing left to run, listen for or move has simply finished.
+      if (!r.ended && r.tasks.length === 0 && r.handlers.length === 0 && r.world.things.length === 0) {
+        r.ended = true;
+        this.ended = true;
+        this.opts.onEnd?.();
+        return;
+      }
       if (r.ended) {
         this.ended = true;
         if (r.error) this.opts.onError(r.error);

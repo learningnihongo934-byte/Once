@@ -3,8 +3,10 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { OnceError, formatError } from './errors';
 import { Runner } from './interp';
+import { Thing } from './values';
 import { parse } from './parser';
 import { completions, explain, signatureAt } from './explain';
+import { LESSONS } from './lessons';
 
 const root = join(__dirname, '..');
 let passed = 0, failed = 0;
@@ -95,6 +97,49 @@ const sig = signatureAt('say clamp(1, 2', 0, 14);
 report('signature help', !!sig && sig.label === 'clamp(x, low, high)' && sig.active === 1, JSON.stringify(sig));
 const comp = completions('set ball to 1\nsay ba', 1, 6).map((c) => c.label);
 report('completions', comp.includes('ball') && comp.includes('sqrt'), comp.slice(0, 10).join(', '));
+
+// Every lesson: its solution must pass its check, and its starter must not.
+for (const l of LESSONS) {
+  for (const which of ['solution', 'starter'] as const) {
+    const code = l[which];
+    const out: string[] = [];
+    let err: OnceError | null = null;
+    let runner: Runner | null = null;
+    try {
+      runner = new Runner(parse(code), {
+        graphics: true, say: (t) => out.push(t), drawPersistent: () => {}, clear: () => {}, playNote: () => {},
+        playSound: () => {}, holding: () => false, mouse: () => ({ x: 300, y: 100, down: false }),
+      });
+      runner.start();
+      for (let i = 0; i < Math.round((l.wait ?? 0.7) * 60) && !runner.ended; i++) runner.tick(1 / 60);
+      err = runner.error;
+    } catch (e) { if (e instanceof OnceError) err = e; else throw e; }
+    const hint = l.check({ code, bare: code.replace(/--.*$/gm, ''), out, error: err, things: runner ? runner.world.things : [], vars: runner ? runner.globals.vars : new Map() });
+    if (which === 'solution') report(`lesson ${l.id} solution`, !err && hint === null, err ? formatError(err, code, l.id) : `check said: ${hint}\noutput: ${out.join(' | ')}`);
+    else if (l.id !== 'shooter-6') report(`lesson ${l.id} starter is not already done`, hint !== null, 'the starter code already passes the check');
+  }
+}
+
+// Play the finished shooter for 40 seconds: shoot at the nearest enemy every 10 frames.
+{
+  const code = LESSONS[LESSONS.length - 1].solution;
+  const out: string[] = [];
+  const mouse = { x: 0, y: 0, down: false };
+  const r = new Runner(parse(code), {
+    graphics: true, say: (t) => out.push(t), drawPersistent: () => {}, clear: () => {}, playNote: () => {},
+    playSound: () => {}, holding: () => false, mouse: () => mouse,
+  });
+  r.start();
+  let frames = 0;
+  for (; frames < 2400 && !r.ended; frames++) {
+    const enemies = (r.globals.vars.get("enemies") ?? []) as Thing[];
+    if (frames % 10 === 0 && enemies.length) { mouse.x = enemies[0].x; mouse.y = enemies[0].y; r.clicks++; }
+    r.tick(1 / 60);
+  }
+  const score = r.globals.vars.get('score');
+  report('shooter plays for 40s', !r.error && typeof score === 'number' && score > 5,
+    r.error ? formatError(r.error, code, 'shooter') : `score ${String(score)}, frames ${frames}, said: ${out.join(' | ')}`);
+}
 
 console.log(`${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

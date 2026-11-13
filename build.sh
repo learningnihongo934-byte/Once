@@ -17,9 +17,10 @@ COMMON=(--bundle --target=es2020 --loader:.once=text --define:ONCE_VERSION="\"$V
 rm -rf dist && mkdir -p dist/web
 $ESB src/web/playground.ts "${COMMON[@]}" --minify --format=iife --outfile=dist/web/playground.js
 $ESB src/web/docs.ts "${COMMON[@]}" --minify --format=iife --outfile=dist/web/docs.js
+$ESB src/web/learn.ts "${COMMON[@]}" --minify --format=iife --outfile=dist/web/learn.js
 $ESB src/web/standalone.ts "${COMMON[@]}" --minify --format=iife --outfile=dist/web/once-web.js
 $ESB src/cli.ts "${COMMON[@]}" --platform=node --format=cjs --outfile=dist/once.cjs
-cp web/index.html web/docs.html web/style.css dist/web/
+cp web/index.html web/docs.html web/learn.html web/style.css dist/web/
 printf '/book.html /docs.html 301\n/book /docs 301\n' > dist/web/_redirects
 rm -rf vscode/out && mkdir -p vscode/out/web
 $ESB src/vscode/extension.ts "${COMMON[@]}" --platform=node --format=cjs --external:vscode --outfile=vscode/out/extension.js

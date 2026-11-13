@@ -2,7 +2,7 @@
 
 **Once** is a little programming language for moving pictures. It reads like English, has friendly error messages, and comes with drawing, keyboard and mouse input, sound and simple physics built in.
 
-Try it in your browser: **https://once.rennko.tech** (the playground), and learn it from **[the docs](https://once.rennko.tech/docs.html)**.
+Try it in your browser: **https://once.rennko.tech** (the playground), learn it step by step at **[/learn](https://once.rennko.tech/learn)** (23 interactive lessons that end with you building a top-down shooter), and look things up in **[the docs](https://once.rennko.tech/docs.html)**.
 
 ```
 -- Bouncing balls
@@ -46,6 +46,8 @@ Once is a tree-walking interpreter written in TypeScript. Every statement runs a
 - `src/interp.ts`: the runner (tasks, events, `every`, `when`), with the friendly runtime errors
 - `src/world.ts`: the physics (gravity, bouncing, solid shapes pushing apart)
 - `src/stdlib.ts`: built-in instructions
+- `src/lessons.ts`: the Learn course (each lesson has a starter, a solution and a check)
+- `src/explain.ts`, `src/worddocs.ts`: hover explanations, autocomplete and input hints
 - `src/web/`: the playground, the canvas stage (drawing, input, Web Audio), the docs, and the exported-page runtime
 - `src/vscode/`: the VS Code extension (live mistakes, preview panel, run and export commands)
 - `src/cli.ts`: the `once` command
