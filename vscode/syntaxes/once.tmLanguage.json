@@ -29,14 +29,14 @@
     },
     "keywords": {
       "patterns": [
-        { "name": "keyword.control.once", "match": "\\b(if|then|otherwise|else|end|repeat|times|while|until|forever|for|each|in|from|to|by|give|back|stop|skip|every|when|frame|seconds?|key|pressed|clicked|the)\\b" },
-        { "name": "keyword.other.command.once", "match": "\\b(set|change|say|wait|draw|background|clear|play|note|sound|add|remove|hide|show|new)\\b" },
-        { "name": "keyword.operator.word.once", "match": "\\b(and|or|not|is|above|below|at|least|most|more|less|than|mod|of|random|any|holding|touches|contains|item)\\b" },
+        { "name": "keyword.control.once", "match": "\\b(if|then|otherwise|else|end|repeat|times|while|until|forever|for|each|in|from|to|by|give|back|stop|skip|every|when|frame|seconds?|key|pressed|clicked|the|choose|case|try|after)\\b" },
+        { "name": "keyword.other.command.once", "match": "\\b(set|change|say|wait|draw|background|clear|play|note|sound|add|remove|hide|show|new|fail|check|do|forget|swap|save|load|move|turn)\\b" },
+        { "name": "keyword.operator.word.once", "match": "\\b(and|or|not|is|above|below|at|least|most|more|less|than|mod|of|random|any|holding|touches|contains|item|given|between)\\b" },
         { "name": "constant.language.once", "match": "\\b(true|false|nothing|edge)\\b" },
-        { "name": "variable.language.once", "match": "\\b(width|height|mouse|pi|time|gravity)\\b" },
+        { "name": "variable.language.once", "match": "\\b(width|height|mouse|pi|time|gravity|problem)\\b" },
         { "name": "support.type.shape.once", "match": "\\b(circle|box|line|text|square|rectangle)\\b" },
         { "name": "variable.parameter.setting.once", "match": "\\b(size|color|moving|bouncy|solid|fixed|hidden|outline|angle|wave|volume)\\b" },
-        { "name": "support.function.once", "match": "\\b(sqrt|abs|round|floor|ceil|sin|cos|tan|angle|distance|min|max|sum|clamp|number|length|upper|lower|join|split|range|sort|reverse|find|keys|rgb|hsl)(?=\\s*\\()" },
+        { "name": "support.function.once", "match": "\\b(sqrt|abs|round|floor|ceil|sin|cos|tan|angle|distance|min|max|sum|clamp|number|length|upper|lower|join|split|range|sort|reverse|find|keys|rgb|hsl|exp|log|sign|lerp|average|asin|acos|atan|chance|shuffle|sample|trim|replace|slice|title|count|code|letter|begins|ends|pad|pop|insert|unique|flatten|zip|fill|copy|values|merge|map|filter|reduce|sortby|some|all|type|ask|now|randomcolor|mix|measure|direction|nearest)(?=\\s*\\()" },
         { "name": "entity.name.function.call.once", "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\()" },
         { "name": "keyword.operator.once", "match": "'s\\b|[-+*/^%=<>!]=?" }
       ]

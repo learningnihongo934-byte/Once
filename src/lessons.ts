@@ -568,6 +568,30 @@ the end</pre>`,
     check: (c) => (c.error ? 'There is still a problem. Read the Problems panel.' : c.out.includes('Score: 15') ? null : 'Make sure the say line is after the end of the repeat, so it runs once.'),
   },
   {
+    id: 'tools', part: PICTURES, title: 'Bigger tools',
+    body: `
+<p>Once has the same kind of bigger tools as Python. A few of the most useful:</p>
+<p><code>choose</code> picks steps by value:</p>
+<pre class="once">choose weapon
+  case "sword", "axe"
+    say "Close range"
+  otherwise
+    say "Long range"
+end</pre>
+<p><code>given</code> writes quick instructions inside a line. With <code>map</code> and <code>filter</code> they change or pick items from a list:</p>
+<pre class="once">say map([1, 2, 3], given n: n * 10)          -- [10, 20, 30]
+say filter([4, 9, 2], given n: n is above 3)  -- [4, 9]</pre>
+<p><code>try ... otherwise</code> catches a problem instead of stopping, and <code>save</code>/<code>load</code> remember a value (like a high score) even after the page closes. The <a href="docs.html#more">docs</a> list every tool.</p>`,
+    task: 'Use <code>choose</code> to say a word for <code>roll</code>, and use <code>map</code> with <code>given</code> to double the list <code>[1, 2, 3]</code> (say the result).',
+    starter: '-- Bigger tools\nset roll to random 1 to 3\n',
+    solution: '-- Bigger tools\nset roll to random 1 to 3\nchoose roll\n  case 1\n    say "one"\n  case 2\n    say "two"\n  otherwise\n    say "three"\nend\n\nsay map([1, 2, 3], given n: n * 2)\n',
+    check: (c) => {
+      if (!has(c, /^\s*choose\b/m) || !has(c, /^\s*case\b/m)) return 'Add a choose roll block with case lines.';
+      if (!has(c, /map\s*\(/) || !has(c, /\bgiven\b/)) return 'Use map(..., given n: n * 2).';
+      return c.out.includes('[2, 4, 6]') ? null : 'Say the result of the map. It should be [2, 4, 6].';
+    },
+  },
+  {
     id: 'shooter-1', part: SHOOTER, title: 'The player',
     body: `
 <p>Time to build a real game: a <b>top-down shooter</b>. You move a little ship around, aim with the mouse, and shoot the enemies that keep coming at you.</p>

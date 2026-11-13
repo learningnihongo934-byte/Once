@@ -1,6 +1,6 @@
-import { Stmt } from './ast';
+import { Expr, Stmt } from './ast';
 
-export type Value = number | string | boolean | null | Value[] | Rec | Thing | Fn | Builtin | Edge;
+export type Value = number | string | boolean | null | Value[] | Rec | Thing | Fn | Builtin | GenBuiltin | Lambda | Edge;
 
 /** A record, written {name: "Pip", age: 3}. */
 export class Rec {
@@ -10,6 +10,22 @@ export class Rec {
 /** Instructions the story wrote with `to name ... end`. */
 export class Fn {
   constructor(public def: Extract<Stmt, { k: 'fn' }>, public closure: unknown) {}
+}
+
+/** Quick instructions written inside a line: `given x: x * 2`. */
+export class Lambda {
+  constructor(public params: string[], public body: Expr, public closure: unknown) {}
+}
+
+/** Calls a story's instructions from inside a built-in (map, filter, ...). */
+export type Caller = (f: Value, args: Value[]) => Generator<unknown, Value, unknown>;
+
+/** Built-ins that take instructions as an input, so they need to call back into the story. */
+export class GenBuiltin {
+  constructor(
+    public name: string,
+    public gen: (args: Value[], call: Caller, fail: (msg: string, hint?: string) => never) => Generator<unknown, Value, unknown>,
+  ) {}
 }
 
 /** Instructions that come with Once, like sqrt or length. */
@@ -56,7 +72,8 @@ export function typeName(v: Value): string {
   if (v instanceof Rec) return 'a record';
   if (v instanceof Thing) return `a ${v.kind}`;
   if (v instanceof Fn) return `the instructions \`${v.def.name}\``;
-  if (v instanceof Builtin) return `the built-in instructions \`${v.name}\``;
+  if (v instanceof Builtin || v instanceof GenBuiltin) return `the built-in instructions \`${v.name}\``;
+  if (v instanceof Lambda) return 'quick instructions (given ...)';
   if (v instanceof Edge) return 'the edge';
   return 'something';
 }
@@ -77,7 +94,8 @@ export function textOf(v: Value, nested = false): string {
   if (v instanceof Rec) return '{' + [...v.m].map(([k, x]) => `${k}: ${textOf(x, true)}`).join(', ') + '}';
   if (v instanceof Thing) return v.kind === 'text' ? `a text "${v.text}"` : `a ${v.kind} at ${fmtNum(v.x)}, ${fmtNum(v.y)}`;
   if (v instanceof Fn) return `the instructions ${v.def.name}`;
-  if (v instanceof Builtin) return `the built-in ${v.name}`;
+  if (v instanceof Builtin || v instanceof GenBuiltin) return `the built-in ${v.name}`;
+  if (v instanceof Lambda) return `the instructions given ${v.params.join(' and ')}`;
   if (v instanceof Edge) return 'the edge';
   return '?';
 }
@@ -134,3 +152,48 @@ export const COLOR_NAMES = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'
   'sienna', 'orchid', 'firebrick', 'goldenrod', 'seagreen', 'steelblue', 'slateblue', 'wheat', 'linen', 'cornsilk',
   'darkgreen', 'darkblue', 'darkred', 'lightblue', 'lightgreen', 'hotpink', 'aqua', 'cyan', 'magenta', 'forestgreen',
   'midnightblue', 'cadetblue', 'rosybrown', 'burlywood', 'transparent'];
+
+/** The name `type(x)` and `is a ...` use for a value. */
+export function kindOf(v: Value): string {
+  if (v === null) return 'nothing';
+  if (typeof v === 'number') return 'number';
+  if (typeof v === 'string') return 'text';
+  if (typeof v === 'boolean') return 'truth';
+  if (Array.isArray(v)) return 'list';
+  if (v instanceof Rec) return 'record';
+  if (v instanceof Thing) return 'shape';
+  if (v instanceof Edge) return 'edge';
+  return 'instructions';
+}
+
+export const KINDS = ['number', 'text', 'truth', 'list', 'record', 'shape', 'instructions', 'nothing'];
+
+/** Turns a value into JSON text for `save`. Shapes and instructions can't be saved. */
+export function toSaved(v: Value): unknown {
+  if (v === null || typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean') return v;
+  if (Array.isArray(v)) return v.map(toSaved);
+  if (v instanceof Rec) return { $record: Object.fromEntries([...v.m].map(([k, x]) => [k, toSaved(x)])) };
+  throw new Error(kindOf(v));
+}
+
+export function fromSaved(j: unknown): Value {
+  if (j === null || typeof j === 'number' || typeof j === 'string' || typeof j === 'boolean') return j;
+  if (Array.isArray(j)) return j.map(fromSaved);
+  if (j && typeof j === 'object' && '$record' in j) {
+    const r = new Rec();
+    for (const [k, x] of Object.entries((j as { $record: Record<string, unknown> }).$record)) r.m.set(k, fromSaved(x));
+    return r;
+  }
+  return null;
+}
+
+/** A deep copy of lists and records (shapes and instructions are shared). */
+export function deepCopy(v: Value): Value {
+  if (Array.isArray(v)) return v.map(deepCopy);
+  if (v instanceof Rec) {
+    const r = new Rec();
+    for (const [k, x] of v.m) r.m.set(k, deepCopy(x));
+    return r;
+  }
+  return v;
+}

@@ -311,7 +311,9 @@ var RESERVED = /* @__PURE__ */ new Set([
   "mod",
   "of",
   "touches",
-  "contains"
+  "contains",
+  "given",
+  "case"
 ]);
 var STATEMENTS = [
   "say",
@@ -335,8 +337,20 @@ var STATEMENTS = [
   "remove",
   "hide",
   "show",
-  "new"
+  "new",
+  "choose",
+  "try",
+  "fail",
+  "check",
+  "forget",
+  "swap",
+  "after",
+  "save",
+  "load",
+  "move",
+  "turn"
 ];
+var SOFT = /* @__PURE__ */ new Set(["choose", "try", "fail", "check", "do", "forget", "swap", "after", "save", "load", "move", "turn"]);
 var FROM_ELSEWHERE = {
   print: "say",
   log: "say",
@@ -346,6 +360,16 @@ var FROM_ELSEWHERE = {
   return: "give back",
   def: "to",
   function: "to",
+  raise: "fail",
+  throw: "fail",
+  assert: "check",
+  pass: "do nothing",
+  del: "forget",
+  match: "choose",
+  switch: "choose",
+  except: "otherwise",
+  catch: "otherwise",
+  lambda: "given",
   func: "to",
   fn: "to",
   let: "set",
@@ -370,7 +394,8 @@ var KIND_ALIASES = { square: "box", rectangle: "box", rect: "box", dot: "circle"
 var NOTE_CLAUSES = { for: [1, 1], wave: [1, 1], volume: [1, 1] };
 var SOUND_CLAUSES = { volume: [1, 1] };
 var END_WORDS = /* @__PURE__ */ new Set(["if", "repeat", "for", "to", "every", "when", "each"]);
-var VALUE_WORDS = /* @__PURE__ */ new Set(["true", "false", "nothing", "random", "any", "holding", "not", "new"]);
+var VALUE_WORDS = /* @__PURE__ */ new Set(["true", "false", "nothing", "random", "any", "holding", "not", "new", "given"]);
+var KIND_WORDS = /* @__PURE__ */ new Set(["number", "text", "truth", "list", "record", "shape", "thing", "instructions", "nothing"]);
 function parse(src) {
   const p = new Parser(lex(src));
   return p.program();
@@ -514,6 +539,14 @@ var Parser = class _Parser {
   statement() {
     const t = this.peek();
     if (t.t !== "id") return this.exprStatement();
+    if (SOFT.has(t.v)) {
+      const n = this.peek(1);
+      const usedAsName = n.t === "poss" || n.t === "op" && ["(", ".", "[", "="].includes(n.v);
+      if (!usedAsName) {
+        const s = this.softStatement(t);
+        if (s) return s;
+      }
+    }
     switch (t.v) {
       case "set": {
         this.next();
@@ -572,6 +605,7 @@ var Parser = class _Parser {
         break;
       case "wait": {
         this.next();
+        if (this.eatWord("until")) return { k: "waituntil", e: this.expr(), s: this.spanFrom(t) };
         const e = this.expr();
         if (!this.eatWord("seconds") && !this.eatWord("second")) {
           if (this.peek().t === "id" && /^(sec|secs|s|ms|frames?|minutes?)$/.test(this.peek().v)) {
@@ -624,6 +658,8 @@ var Parser = class _Parser {
       case "show":
         this.next();
         return { k: t.v, e: this.expr(), s: this.spanFrom(t) };
+      case "case":
+        syntaxError(span(t), "`case` only goes inside a `choose` block.", 'Like:\nchoose day\n  case "sat", "sun"\n    say "weekend"\nend');
       case "end":
         syntaxError(span(t), "There is an extra `end` here. Nothing is open for it to close.", "Check that each `end` matches an if, repeat, for each, to, every or when above it.");
       case "otherwise":
@@ -638,6 +674,120 @@ var Parser = class _Parser {
         syntaxError(span(t), "`times` goes after a number in a repeat, like `repeat 3 times`.");
     }
     return this.exprStatement();
+  }
+  softStatement(t) {
+    switch (t.v) {
+      case "choose":
+        return this.choose();
+      case "try":
+        return this.tryStatement();
+      case "fail":
+        this.next();
+        if (this.atLineEnd()) syntaxError(span(t), "`fail` needs a message.", 'Like `fail "The level file is broken"`.');
+        return { k: "fail", value: this.expr(), s: this.spanFrom(t) };
+      case "check":
+        this.next();
+        if (this.atLineEnd()) syntaxError(span(t), "`check` needs something that should be true.", "Like `check lives is at least 0`.");
+        return { k: "check", e: this.expr(), s: this.spanFrom(t) };
+      case "do":
+        if (!this.isWord("nothing", 1)) return null;
+        this.next();
+        this.next();
+        return { k: "pass", s: this.spanFrom(t) };
+      case "forget":
+        this.next();
+        return { k: "forget", target: this.target(), s: this.spanFrom(t) };
+      case "swap": {
+        this.next();
+        const a = this.target();
+        this.expectWord("and", void 0, "Write it like `swap a and b`.");
+        const b = this.target();
+        return { k: "swap", a, b, s: this.spanFrom(t) };
+      }
+      case "after": {
+        this.next();
+        const e = this.expr();
+        if (!this.eatWord("seconds") && !this.eatWord("second")) syntaxError(span(this.peek()), "After the number, write `seconds`.", "Like `after 2 seconds`.");
+        const sp = this.spanFrom(t);
+        this.headerEnd(t);
+        const [loops, inFn] = [this.loops, this.inFn];
+        this.loops = 0;
+        this.inFn = false;
+        const body = this.block(t, ["end"]);
+        this.loops = loops;
+        this.inFn = inFn;
+        this.closeBlock(t);
+        return { k: "after", e, body, s: sp };
+      }
+      case "save":
+      case "load": {
+        this.next();
+        const n = this.name(t.v === "save" ? "value to save" : "value to load");
+        return { k: t.v, name: n.v, s: this.spanFrom(t) };
+      }
+      case "move":
+      case "turn": {
+        this.next();
+        const target = this.postfix();
+        let mode;
+        if (this.eatWord("by")) mode = "by";
+        else {
+          this.expectWord("to", `After \`${t.v} ...\`, write \`by\` or \`to\`.`, t.v === "move" ? "Like `move player by 4, 0` or `move player to 240, 180`." : "Like `turn box by 15` or `turn box to 90`.");
+          mode = "to";
+        }
+        if (t.v === "turn") return { k: "turn", target, mode, e: this.expr(), s: this.spanFrom(t) };
+        const x = this.expr();
+        this.expectOp(",", void 0, "Moving needs two numbers, across and down, like `move player by 4, 0`.");
+        const y = this.expr();
+        return { k: "move", target, mode, x, y, s: this.spanFrom(t) };
+      }
+    }
+    return null;
+  }
+  choose() {
+    const start = this.next();
+    const subject = this.expr();
+    const sp = this.spanFrom(start);
+    this.headerEnd(start);
+    const cases = [];
+    let els = null;
+    const stops = ["case", "otherwise", "else", "end"];
+    for (; ; ) {
+      this.skipNl();
+      const t = this.peek();
+      if (t.t === "id" && t.v === "case") {
+        this.next();
+        if (els) syntaxError(span(t), "This `case` comes after `otherwise`, so it can never happen.", "Put `otherwise` last.");
+        const vals = [this.additive()];
+        while (this.eatOp(",") || this.eatWord("or")) vals.push(this.additive());
+        this.eatWord("then");
+        this.headerEnd(t);
+        cases.push({ vals, body: this.block(start, stops) });
+      } else if (t.t === "id" && (t.v === "otherwise" || t.v === "else")) {
+        this.next();
+        if (els) syntaxError(span(t), "This `choose` already has an `otherwise`.");
+        this.headerEnd(t);
+        els = this.block(start, stops);
+      } else if (t.t === "id" && t.v === "end") break;
+      else if (t.t === "eof") syntaxError(span(start), `This \`choose\` on line ${start.line} is never closed with \`end\`.`);
+      else syntaxError(span(t), "Inside `choose`, each choice starts with `case`.", 'Like:\nchoose day\n  case "sat", "sun"\n    say "weekend"\n  otherwise\n    say "work"\nend');
+    }
+    if (!cases.length) syntaxError(span(start), "This `choose` has no `case` lines.");
+    this.closeBlock(start);
+    return { k: "choose", subject, cases, els, s: sp };
+  }
+  tryStatement() {
+    const start = this.next();
+    this.headerEnd(start);
+    const body = this.block(start, ["otherwise", "else", "end"]);
+    let handler = null;
+    if (this.isWord("otherwise") || this.isWord("else")) {
+      const o = this.next();
+      this.headerEnd(o);
+      handler = this.block(start, ["end"]);
+    }
+    this.closeBlock(start);
+    return { k: "try", body, handler, s: span(start) };
   }
   exprStatement() {
     const t = this.peek();
@@ -912,8 +1062,26 @@ var Parser = class _Parser {
     let op = null;
     if (t.t === "id" && t.v === "is") {
       this.next();
-      if (this.eatWord("not")) op = "ne";
-      else if (this.eatWord("above")) op = "gt";
+      const neg = this.eatWord("not");
+      const wrap = (e2) => neg ? { k: "un", op: "not", a: e2, s: e2.s } : e2;
+      const art = this.isWord("a") || this.isWord("an");
+      const kindTok = this.peek(art ? 1 : 0);
+      if (kindTok.t === "id" && (art ? KIND_WORDS.has(kindTok.v) : kindTok.v === "text" && this.peek(1).t !== "op" && this.peek(1).t !== "poss")) {
+        if (art) this.next();
+        this.next();
+        return wrap({ k: "isa", v: a, kind: kindTok.v === "shape" || kindTok.v === "thing" ? "shape" : kindTok.v, s: this.spanFrom(t) });
+      }
+      if (this.eatWord("between")) {
+        const lo = this.additive();
+        this.expectWord("and", void 0, "Write it like `x is between 1 and 10`.");
+        const hi = this.additive();
+        return wrap({ k: "between", v: a, lo, hi, s: join(a.s, hi.s, t) });
+      }
+      if (this.eatWord("in")) {
+        const b3 = this.additive();
+        return wrap({ k: "bin", op: "in", a, b: b3, s: join(a.s, b3.s, t) });
+      }
+      if (this.eatWord("above")) op = "gt";
       else if (this.eatWord("below")) op = "lt";
       else if (this.isWord("more") || this.isWord("greater") || this.isWord("bigger")) {
         this.next();
@@ -927,6 +1095,11 @@ var Parser = class _Parser {
         this.next();
         op = this.next().v === "least" ? "ge" : "le";
       } else op = "eq";
+      const b2 = this.additive();
+      const e = { k: "bin", op, a, b: b2, s: join(a.s, b2.s, t) };
+      if (!neg) return e;
+      if (op === "eq") return { ...e, op: "ne" };
+      return wrap(e);
     } else if (t.t === "op" && ["=", "==", "!=", "<", ">", "<=", ">="].includes(t.v)) {
       this.next();
       op = { "=": "eq", "==": "eq", "!=": "ne", "<": "lt", ">": "gt", "<=": "le", ">=": "ge" }[t.v];
@@ -1033,6 +1206,16 @@ var Parser = class _Parser {
         while (!this.isOp("]")) {
           if (this.peek().t === "eof") break;
           items.push(this.expr());
+          if (items.length === 1 && this.isWord("for")) {
+            this.next();
+            this.eatWord("each");
+            const name = this.name("item").v;
+            this.expectWord("in", void 0, "Write it like `[x * 2 for each x in numbers]`.");
+            const list = this.expr();
+            const cond = this.eatWord("if") ? this.expr() : null;
+            this.expectOp("]", void 0, "A list made with `for each` ends with `]`.");
+            return { k: "comp", item: items[0], name, list, cond, s: this.spanFrom(t) };
+          }
           if (!this.eatOp(",")) break;
         }
         this.expectOp("]", `I expected \`]\` to close the list started on line ${t.line}, but found ${describe(this.peek())}.`, "Items in a list are separated by commas.");
@@ -1077,6 +1260,17 @@ var Parser = class _Parser {
           this.next();
           this.expectWord("of", void 0, "Write it like `any of colors`, to pick one at random.");
           return { k: "any", list: this.unary(), s: this.spanFrom(t) };
+        }
+        case "given": {
+          this.next();
+          const params = [];
+          while (!this.isOp(":")) {
+            if (params.length && !this.eatWord("and") && !this.eatOp(",")) syntaxError(span(this.peek()), "Separate the inputs with `and`, then end with `:`.", "Like `given a and b: a + b`.");
+            params.push(this.name("input").v);
+          }
+          this.next();
+          const body = this.expr();
+          return { k: "lambda", params, body, s: this.spanFrom(t) };
         }
         case "holding": {
           this.next();
@@ -1148,6 +1342,19 @@ function srcOf(e) {
 // src/worddocs.ts
 var d = (kind, sig, doc, example) => ({ kind, sig, doc, example });
 var STATEMENTS2 = {
+  choose: d("statement", "choose value / case a, b / otherwise / end", "Picks the steps of the first case that matches the value. Like match or switch in other languages.", 'choose key\n  case "w", "up"\n    move player by 0, -4\n  otherwise\n    do nothing\nend'),
+  case: d("keyword", "case value1, value2", "One choice inside choose. Several values can share a case, separated by commas or or."),
+  try: d("statement", "try ... otherwise ... end", "Runs the steps, and if something goes wrong, runs the otherwise steps instead of stopping the program. The message is in problem.", 'try\n  set n to number(answer)\notherwise\n  say "That is not a number: {problem}"\nend'),
+  fail: d("statement", 'fail "message"', "Stops the program with your own error message, or jumps to the otherwise of a surrounding try.", 'if lives is below 0 then fail "lives went negative"'),
+  check: d("statement", "check condition", "Stops the program if the condition is not true, showing both sides of the comparison. Handy for catching bugs early.", "check score is at least 0"),
+  do: d("statement", "do nothing", "A step that does nothing, for a block you will fill in later."),
+  forget: d("statement", "forget name / forget record's key / forget item n of list", "Removes a name, a value from a record or shape, or an item from a list.", "forget hero's shield"),
+  swap: d("statement", "swap a and b", "Swaps two values.", "swap first and second"),
+  after: d("statement", "after N seconds ... end", "Runs the steps once, after a delay, while the rest of the program keeps going.", "after 2 seconds\n  hide message\nend"),
+  save: d("statement", "save name", "Remembers a value (numbers, text, lists, records) even after the page is closed. Get it back with load.", "if score is above best\n  set best to score\n  save best\nend"),
+  load: d("statement", "load name", "Gets back a value kept with save. If nothing was saved yet, the name keeps its current value.", "set best to 0\nload best"),
+  move: d("statement", "move shape by dx, dy / move shape to x, y", "Moves a shape (or a list of shapes) by an amount, or to a place.", "move player by 4, 0\nmove ball to 240, 180"),
+  turn: d("statement", "turn shape by degrees / turn shape to degrees", "Turns a box by an amount, or to an angle.", "turn wheel by 5"),
   say: d("statement", "say value", "Prints a line of text. Inside text, `{name}` is replaced by its value.", 'say "Hello, {name}!"'),
   set: d("statement", "set name to value", "Keeps a value under a name, creating the name if it is new. Also sets properties (`ball's x`) and list items (`item 2 of xs`).", `set score to 0
 set ball's color to "gold"`),
@@ -1160,7 +1367,7 @@ set ball's color to "gold"`),
   repeat: d("statement", "repeat N times / repeat while c / repeat until c / repeat forever", "Runs the steps again and again. `repeat forever` runs once per frame (60 times a second) and never freezes the page.", 'repeat 3 times\n  say "knock"\nend'),
   times: d("keyword", "repeat N times", "How many times a `repeat` runs."),
   while: d("keyword", "repeat while condition", "Keeps repeating while the condition stays true.", "repeat while x is below 100\n  set x to x * 2\nend"),
-  until: d("keyword", "repeat until condition", "Keeps repeating until the condition becomes true."),
+  until: d("keyword", "repeat until condition / wait until condition", "Keeps repeating, or keeps waiting, until the condition becomes true.", "wait until score is 10"),
   forever: d("keyword", "repeat forever", "Repeats once per frame until the program ends or a `stop` runs. Drawings inside are redrawn each frame."),
   for: d("statement", "for each name in list / for each name from a to b [by step]", "Runs the steps once for each item of a list (or each letter of text), or for each number in a range. Ranges include both ends.", "for each n from 1 to 5\n  say n\nend\nfor each pet in pets\n  say pet\nend"),
   each: d("keyword", "for each name in list", "Part of a `for each` loop."),
@@ -1197,7 +1404,9 @@ end`),
   new: d("statement", "new circle|box|text ...settings", "Makes a shape that stays on screen and moves by itself. Keep it in a name to change it later.", "set ball to new circle at 100, 50 size 30 moving 3, 0 bouncy")
 };
 var OPERATORS = {
-  is: d("operator", "a is b / is not / is above / is below / is at least / is at most", "Compares two values. Lists and records are equal when their contents are equal.", 'if score is at least 10 then say "nice"'),
+  given: d("operator", "given x: expression / given a and b: expression", "Quick instructions written inside a line, for map, filter, sortby and friends. Like lambda in Python.", "set double to given n: n * 2\nsay map([1, 2, 3], given n: n * 10)"),
+  between: d("operator", "x is between a and b", "True when x is from a to b, including both ends.", 'if age is between 13 and 19 then say "teen"'),
+  is: d("operator", "a is b / is not / is above / is below / is at least / is at most / is between a and b / is in list / is a number", "Compares two values. Lists and records are equal when their contents are equal. `is a` checks the kind of a value: number, text, truth, list, record, shape, instructions or nothing.", 'if score is at least 10 then say "nice"\nif answer is a number then say "thanks"'),
   not: d("operator", "not condition / is not", "Flips true and false.", 'if not holding "space" then say "let go"'),
   and: d("operator", "a and b", "True when both sides are true. Also joins inputs in `to name a and b`."),
   or: d("operator", "a or b", "True when either side is true."),
@@ -1212,7 +1421,7 @@ var OPERATORS = {
   item: d("operator", "item n of list", "The nth item. Lists count from 1; negative numbers count from the end. Same as `list[n]`.", "say item 1 of names"),
   holding: d("operator", 'holding "key"', "True while the key is held down.", `if holding "left" then change hero's x by -4`),
   touches: d("operator", "a touches b / a touches edge", "True when two shapes overlap. Either side can be a list of shapes. `edge` is the border of the preview.", "if ball touches paddle then set ball's dy to -5"),
-  contains: d("operator", "list contains value / text contains text", "True when the value is in the list (or the text is inside the text)."),
+  contains: d("operator", "list contains value / text contains text", "True when the value is in the list (or the text is inside the text). The other way round: value is in list."),
   true: d("value", "true", "Yes."),
   false: d("value", "false", 'No. `false`, `nothing`, `0` and `""` all count as no in an `if`.'),
   nothing: d("value", "nothing", "No value at all. Instructions without `give back` give back nothing.")
@@ -1240,6 +1449,50 @@ var SETTINGS = {
   volume: d("setting", "volume 0 to 1", "How loud a note or sound is. 0.5 is the default.")
 };
 var FUNCTIONS = {
+  exp: d("function", "exp(x)", "e (2.718...) to the power of x."),
+  log: d("function", "log(x) / log(x, base)", "The natural logarithm, or the logarithm in a base.", "log(1000, 10)   -- 3"),
+  sign: d("function", "sign(x)", "1 for positive numbers, -1 for negative ones, 0 for zero."),
+  lerp: d("function", "lerp(a, b, t)", "The point a fraction t of the way from a to b. Great for smooth movement.", "set camera to lerp(camera, player's x, 0.1)"),
+  average: d("function", "average(list) / average(a, b, ...)", "The mean of some numbers."),
+  asin: d("function", "asin(x)", "The angle (in degrees) whose sine is x."),
+  acos: d("function", "acos(x)", "The angle (in degrees) whose cosine is x."),
+  atan: d("function", "atan(x)", "The angle (in degrees) whose tangent is x. For a direction, angle(dx, dy) is usually easier."),
+  chance: d("function", "chance(percent)", "True this percent of the time.", "if chance(10) then spawn()"),
+  shuffle: d("function", "shuffle(list)", "A copy of the list in random order."),
+  sample: d("function", "sample(list, n)", "n different items picked at random."),
+  trim: d("function", "trim(text)", "Text without spaces at the start and end."),
+  replace: d("function", "replace(text, old, new)", "Text with every old part replaced by new.", 'replace("a-b-c", "-", " ")   -- "a b c"'),
+  slice: d("function", "slice(list or text, from, to)", "The items or letters from one position to another (both included, counting from 1). Negative positions count from the end.", 'slice("hello", 2, 4)   -- "ell"'),
+  title: d("function", "title(text)", "Text With Every Word Capitalized."),
+  count: d("function", "count(list or text, value)", "How many times the value appears."),
+  code: d("function", "code(letter)", 'The number of a letter: code("A") is 65.'),
+  letter: d("function", "letter(number)", 'The letter with that number: letter(66) is "B".'),
+  begins: d("function", "begins(text, start)", "True when the text begins with start."),
+  ends: d("function", "ends(text, finish)", "True when the text ends with finish."),
+  pad: d("function", "pad(value, width, with)", "Text padded on the left to a width, with spaces or another letter.", 'pad(7, 3, "0")   -- "007"'),
+  pop: d("function", "pop(list)", "Takes the last item off the list and gives it back."),
+  insert: d("function", "insert(list, position, value)", "Puts a value into a list at a position (counting from 1)."),
+  unique: d("function", "unique(list)", "A copy without repeated items."),
+  flatten: d("function", "flatten(list of lists)", "One list with the items of all the inner lists."),
+  zip: d("function", "zip(list1, list2)", 'Pairs up items: zip(["a", "b"], [1, 2]) is [["a", 1], ["b", 2]].'),
+  fill: d("function", "fill(n, value)", "A list of n copies of a value.", "set grid to fill(10, 0)"),
+  copy: d("function", "copy(value)", "A separate copy of a list or record, so changing one doesn't change the other."),
+  values: d("function", "values(record)", "The values inside a record, as a list."),
+  merge: d("function", "merge(record1, record2)", "A new record with everything from both (the second wins on clashes)."),
+  map: d("function", "map(list, instructions)", "A new list with the instructions applied to every item.", "map([1, 2, 3], given n: n * 2)   -- [2, 4, 6]"),
+  filter: d("function", "filter(list, instructions)", "The items for which the instructions give back true.", "filter(enemies, given e: e's hp is above 0)"),
+  reduce: d("function", "reduce(list, instructions, start)", "Combines all items into one value, starting from start.", "reduce([1, 2, 3], given total and n: total + n, 0)   -- 6"),
+  sortby: d("function", "sortby(list, instructions)", "A copy sorted by what the instructions give back for each item.", "sortby(enemies, given e: distance(e, player))"),
+  some: d("function", "some(list, instructions)", "True if the instructions give back true for at least one item."),
+  all: d("function", "all(list, instructions)", "True if the instructions give back true for every item."),
+  type: d("function", "type(value)", 'What kind of value it is: "number", "text", "truth", "list", "record", "shape", "instructions" or "nothing".'),
+  ask: d("function", "ask(question)", "Asks the person a question and gives back their answer as text (nothing if they cancel).", 'set name to ask("What is your name?")'),
+  now: d("function", "now()", "The date and time, as a record with year, month, day, weekday, hour, minute and second.", `say "It is {now()'s hour} o'clock"`),
+  randomcolor: d("function", "randomcolor()", "A random bright color."),
+  mix: d("function", "mix(color1, color2, t)", "A color part of the way between two colors (written as codes or rgb).", 'mix("#ff0000", "#0000ff", 0.5)'),
+  measure: d("function", "measure(text, size)", "How wide some text is when drawn at a size."),
+  direction: d("function", "direction(shape1, shape2)", "The angle from one shape to another, in degrees. Use cos and sin of it to move that way.", "set a to direction(enemy, player)"),
+  nearest: d("function", "nearest(shape, list)", "The shape in the list closest to a shape (nothing if the list is empty).", "set target to nearest(player, enemies)"),
   sqrt: d("function", "sqrt(x)", "The square root.", "sqrt(16)   -- 4"),
   abs: d("function", "abs(x)", "The number without its minus sign.", "abs(-3)   -- 3"),
   round: d("function", "round(x) / round(x, places)", "Rounds to the nearest whole number, or to some decimal places.", "round(3.14159, 2)   -- 3.14"),
@@ -1270,6 +1523,7 @@ var FUNCTIONS = {
   hsl: d("function", "hsl(hue, saturation, lightness)", "A color from hue (0 to 360), saturation and lightness (0 to 100).")
 };
 var GLOBALS = {
+  problem: d("value", "problem", "Inside the otherwise of a try: the message of what went wrong."),
   width: d("value", "width", "The width of the preview: 480."),
   height: d("value", "height", "The height of the preview: 360."),
   mouse: d("value", "mouse's x, mouse's y, mouse's down", "Where the mouse is over the preview, and whether a button is down."),
@@ -1398,6 +1652,8 @@ The value given to \`${owner.name}\` when it is used.`);
     if (/\bfrom\b/.test(before) && lead === "draw") return out(fence("draw line from x, y to x, y") + "\n\nWhere the line ends.");
     if (/\bfrom\b/.test(before)) return out(fence("for each n from a to b") + "\n\nThe last number counted (it is included).");
     if (lead === "add") return out(formatDoc(STATEMENTS2.add));
+    if (lead === "move") return out(formatDoc(STATEMENTS2.move));
+    if (lead === "turn") return out(formatDoc(STATEMENTS2.turn));
   }
   if (word === "frame" && prevWord === "every") return out(formatDoc(STATEMENTS2.every));
   const shapeLine = /^\s*(draw|set\s+.*\bto\s+new|new)\b/.test(text) || /\bnew\s+\w+/.test(before);
@@ -1471,6 +1727,9 @@ var SNIPPETS = [
   { label: "when key", kind: "snippet", detail: 'when key "space" is pressed ... end', doc: "React to a key.", insert: 'when key "${1:space}" is pressed\n	$0\nend' },
   { label: "when mouse", kind: "snippet", detail: "when mouse is clicked ... end", doc: "React to a click.", insert: "when mouse is clicked\n	$0\nend" },
   { label: "when touches", kind: "snippet", detail: "when a touches b ... end", doc: "React when two shapes meet.", insert: "when ${1:ball} touches ${2:edge}\n	$0\nend" },
+  { label: "choose", kind: "snippet", detail: "choose value / case ... end", doc: "Pick steps by value (like match).", insert: 'choose ${1:value}\n	case ${2:"a"}\n		$3\n	otherwise\n		$0\nend' },
+  { label: "try", kind: "snippet", detail: "try ... otherwise ... end", doc: "Handle problems without stopping.", insert: "try\n	$1\notherwise\n	say problem$0\nend" },
+  { label: "after", kind: "snippet", detail: "after N seconds ... end", doc: "Run steps once, later.", insert: "after ${1:1} seconds\n	$0\nend" },
   { label: "draw circle", kind: "snippet", detail: "draw circle at x, y size s color c", doc: "Draw a circle.", insert: 'draw circle at ${1:240}, ${2:180} size ${3:40} color "${4:tomato}"' },
   { label: "new circle", kind: "snippet", detail: "new circle that moves and bounces", doc: "A shape that moves by itself.", insert: "new circle at ${1:100}, ${2:100} size ${3:30} moving ${4:3}, ${5:0} bouncy" }
 ];

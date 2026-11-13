@@ -1,0 +1,2 @@
+-- error: The level is broken
+fail "The level is broken"

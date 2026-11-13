@@ -90,6 +90,12 @@ export class Stage {
       playSound: (n, v) => this.sound(n, v),
       holding: (k) => (k === 'any' ? this.keys.size + this.tapped.size > 0 : this.keys.has(k) || this.tapped.has(k)),
       mouse: () => this.mouse,
+      ask: (q) => {
+        this.keys.clear();
+        try { return window.prompt(q || 'Your answer:'); } catch { return null; }
+      },
+      save: (k, json) => { try { localStorage.setItem('once:save:' + k, json); } catch { /* storage blocked */ } },
+      load: (k) => { try { return localStorage.getItem('once:save:' + k); } catch { return null; } },
       isColor: (c) => {
         const p = this.colorProbe;
         p.fillStyle = '#010203';

@@ -100,6 +100,8 @@ export function explain(src: string, line: number, col: number, syms?: Symbols):
     if (/\bfrom\b/.test(before) && lead === 'draw') return out(fence('draw line from x, y to x, y') + '\n\nWhere the line ends.');
     if (/\bfrom\b/.test(before)) return out(fence('for each n from a to b') + '\n\nThe last number counted (it is included).');
     if (lead === 'add') return out(formatDoc(STATEMENTS.add));
+    if (lead === 'move') return out(formatDoc(STATEMENTS.move));
+    if (lead === 'turn') return out(formatDoc(STATEMENTS.turn));
   }
   if (word === 'frame' && prevWord === 'every') return out(formatDoc(STATEMENTS.every));
   const shapeLine = /^\s*(draw|set\s+.*\bto\s+new|new)\b/.test(text) || /\bnew\s+\w+/.test(before);
@@ -178,6 +180,9 @@ const SNIPPETS: Completion[] = [
   { label: 'when key', kind: 'snippet', detail: 'when key "space" is pressed ... end', doc: 'React to a key.', insert: 'when key "${1:space}" is pressed\n\t$0\nend' },
   { label: 'when mouse', kind: 'snippet', detail: 'when mouse is clicked ... end', doc: 'React to a click.', insert: 'when mouse is clicked\n\t$0\nend' },
   { label: 'when touches', kind: 'snippet', detail: 'when a touches b ... end', doc: 'React when two shapes meet.', insert: 'when ${1:ball} touches ${2:edge}\n\t$0\nend' },
+  { label: 'choose', kind: 'snippet', detail: 'choose value / case ... end', doc: 'Pick steps by value (like match).', insert: 'choose ${1:value}\n\tcase ${2:"a"}\n\t\t$3\n\totherwise\n\t\t$0\nend' },
+  { label: 'try', kind: 'snippet', detail: 'try ... otherwise ... end', doc: 'Handle problems without stopping.', insert: 'try\n\t$1\notherwise\n\tsay problem$0\nend' },
+  { label: 'after', kind: 'snippet', detail: 'after N seconds ... end', doc: 'Run steps once, later.', insert: 'after ${1:1} seconds\n\t$0\nend' },
   { label: 'draw circle', kind: 'snippet', detail: 'draw circle at x, y size s color c', doc: 'Draw a circle.', insert: 'draw circle at ${1:240}, ${2:180} size ${3:40} color "${4:tomato}"' },
   { label: 'new circle', kind: 'snippet', detail: 'new circle that moves and bounces', doc: 'A shape that moves by itself.', insert: 'new circle at ${1:100}, ${2:100} size ${3:30} moving ${4:3}, ${5:0} bouncy' },
 ];

@@ -1,5 +1,6 @@
 // The `once` command: run, check or export a story.
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { OnceError, formatError } from './errors';
 import { Runner } from './interp';
@@ -45,6 +46,14 @@ function run(file: string) {
     playSound: () => {},
     holding: () => false,
     mouse: () => ({ x: 0, y: 0, down: false }),
+    ask: (q) => readLine(q),
+    save: (k, json) => {
+      const saves = readSaves();
+      saves[k] = json;
+      mkdirSync(SAVE_DIR, { recursive: true });
+      writeFileSync(SAVE_FILE, JSON.stringify(saves, null, 2));
+    },
+    load: (k) => readSaves()[k] ?? null,
   });
   runner.frameWait = 1 / 60;
   runner.start();
@@ -60,6 +69,31 @@ function run(file: string) {
     else setTimeout(step, Math.min(1000, wait * 1000));
   };
   step();
+}
+
+const SAVE_DIR = join(homedir(), '.once');
+const SAVE_FILE = join(SAVE_DIR, 'saves.json');
+
+function readSaves(): Record<string, string> {
+  try { return JSON.parse(readFileSync(SAVE_FILE, 'utf8')); } catch { return {}; }
+}
+
+/** Reads one line from the keyboard, waiting for Enter (used by ask). */
+function readLine(question: string): string | null {
+  process.stdout.write(question ? question + ' ' : '> ');
+  const buf = Buffer.alloc(1);
+  const bytes: number[] = [];
+  for (;;) {
+    let n = 0;
+    try { n = readSync(0, buf, 0, 1, null); } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'EAGAIN') continue;
+      break;
+    }
+    if (n === 0) return bytes.length ? Buffer.from(bytes).toString('utf8') : null;
+    if (buf[0] === 10) break;
+    bytes.push(buf[0]);
+  }
+  return Buffer.from(bytes).toString('utf8').replace(/\r$/, '');
 }
 
 function check(file: string) {

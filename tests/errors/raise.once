@@ -1,0 +1,2 @@
+-- error: Write `fail` instead
+raise "x"

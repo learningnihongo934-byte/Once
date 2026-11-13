@@ -1,0 +1,2 @@
+-- error: A check failed: the left side is 3 and the right side is 4
+check 1 + 2 is 4

@@ -2,12 +2,12 @@
 
 const FLOW = new Set(['if', 'then', 'otherwise', 'else', 'end', 'repeat', 'times', 'while', 'until', 'forever', 'for',
   'each', 'in', 'from', 'to', 'by', 'give', 'back', 'stop', 'skip', 'every', 'when', 'frame', 'seconds', 'second',
-  'key', 'pressed', 'clicked', 'the', 'with']);
+  'key', 'pressed', 'clicked', 'the', 'with', 'choose', 'case', 'try', 'after']);
 const VERBS = new Set(['set', 'change', 'say', 'wait', 'draw', 'background', 'clear', 'play', 'note', 'sound', 'add',
-  'remove', 'hide', 'show', 'new']);
+  'remove', 'hide', 'show', 'new', 'fail', 'check', 'do', 'forget', 'swap', 'save', 'load', 'move', 'turn']);
 const WORDS = new Set(['and', 'or', 'not', 'is', 'above', 'below', 'at', 'least', 'most', 'more', 'less', 'than',
-  'mod', 'of', 'random', 'any', 'holding', 'touches', 'contains', 'item']);
-const LITERALS = new Set(['true', 'false', 'nothing', 'edge', 'width', 'height', 'mouse', 'pi', 'time', 'gravity']);
+  'mod', 'of', 'random', 'any', 'holding', 'touches', 'contains', 'item', 'given', 'between']);
+const LITERALS = new Set(['true', 'false', 'nothing', 'edge', 'width', 'height', 'mouse', 'pi', 'time', 'gravity', 'problem']);
 const CLAUSES = new Set(['size', 'color', 'moving', 'bouncy', 'solid', 'fixed', 'hidden', 'outline', 'angle', 'wave',
   'volume', 'circle', 'box', 'line', 'text', 'square', 'rectangle']);
 

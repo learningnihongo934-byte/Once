@@ -2,10 +2,10 @@
 // and very long loops can pause and let the picture keep drawing.
 import { Clause, Expr, Program, Stmt } from './ast';
 import { OnceError, Span, closest, runtimeError } from './errors';
-import { BUILTIN_NAMES, builtins } from './stdlib';
+import { BUILTIN_NAMES, builtins, genBuiltins } from './stdlib';
 import {
-  Builtin, COLOR_NAMES, EDGE, Edge, Fn, INK_COLOR, Rec, SOUNDS, Thing, Value, WAVES, equals, noteFreq, normKey,
-  textOf, truthy, typeName,
+  Builtin, COLOR_NAMES, EDGE, Edge, Fn, GenBuiltin, INK_COLOR, Lambda, Rec, SOUNDS, Thing, Value, WAVES,
+  equals, fromSaved, kindOf, noteFreq, normKey, textOf, toSaved, truthy, typeName,
 } from './values';
 import { HEIGHT, WIDTH, World } from './world';
 
@@ -25,6 +25,10 @@ export interface Host {
   holding(key: string): boolean;
   mouse(): { x: number; y: number; down: boolean };
   isColor?(c: string): boolean;
+  /** Asks the person a question and gives back their answer (null if they cancel). */
+  ask?(question: string): string | null;
+  save?(key: string, json: string): void;
+  load?(key: string): string | null;
 }
 
 type Yield = { wait: number } | 'frame' | 'slice';
@@ -83,6 +87,8 @@ export class Runner {
 
   constructor(public program: Program, public host: Host) {
     for (const [name, b] of builtins()) this.globals.vars.set(name, b);
+    for (const [name, b] of genBuiltins()) this.globals.vars.set(name, b);
+    this.hostBuiltins();
     const g = this.globals.vars;
     g.set('width', WIDTH); g.set('height', HEIGHT); g.set('pi', Math.PI); g.set('edge', EDGE);
     g.set('gravity', 0); g.set('time', 0); g.set('frame', 0); g.set('mouse', this.mouseRec);
@@ -410,7 +416,143 @@ export class Runner {
       case 'expr':
         yield* this.eval(s.e, env);
         return;
+      case 'choose': {
+        const v = yield* this.eval(s.subject, env);
+        for (const c of s.cases) {
+          for (const x of c.vals) {
+            if (equals(v, yield* this.eval(x, env))) return yield* this.block(c.body, env);
+          }
+        }
+        if (s.els) return yield* this.block(s.els, env);
+        return;
+      }
+      case 'try': {
+        try {
+          return yield* this.block(s.body, env);
+        } catch (e) {
+          if (!(e instanceof OnceError)) throw e;
+          this.setVar('problem', e.message, env);
+          if (s.handler) return yield* this.block(s.handler, env);
+          return;
+        }
+      }
+      case 'fail':
+        runtimeError(s.s, textOf(yield* this.eval(s.value, env)), 'This is a `fail` in the program. Wrap the code in `try ... otherwise ... end` to handle it.');
+      case 'check': {
+        const e = s.e;
+        if (e.k === 'bin' && ['eq', 'ne', 'lt', 'gt', 'le', 'ge'].includes(e.op)) {
+          const a = yield* this.eval(e.a, env), b = yield* this.eval(e.b, env);
+          if (!truthy(this.binary(e.op, a, b, e))) runtimeError(s.s, `A check failed: the left side is ${textOf(a, true)} and the right side is ${textOf(b, true)}.`, '`check` stops the program when something that should be true is not.');
+          return;
+        }
+        if (!truthy(yield* this.eval(e, env))) runtimeError(s.s, 'A check failed: this was not true.', '`check` stops the program when something that should be true is not.');
+        return;
+      }
+      case 'pass':
+        return;
+      case 'forget': {
+        const t = s.target;
+        if (t.k === 'var') {
+          const found = env.find(t.name);
+          if (!found) this.unknown(t.name, t.s, env);
+          found.vars.delete(t.name);
+        } else if (t.k === 'prop') {
+          const obj = yield* this.eval(t.obj, env);
+          if (obj instanceof Rec) obj.m.delete(t.name);
+          else if (obj instanceof Thing) obj.extra.delete(t.name);
+          else runtimeError(t.obj.s, `I can only forget names, or values inside records and shapes, but this is ${typeName(obj)}.`);
+        } else if (t.k === 'index') {
+          const obj = yield* this.eval(t.obj, env), idx = yield* this.eval(t.idx, env);
+          if (Array.isArray(obj)) obj.splice(this.listIndex(obj, idx, t.idx.s, false), 1);
+          else if (obj instanceof Rec) obj.m.delete(textOf(idx));
+          else runtimeError(t.obj.s, `I can't forget an item of ${typeName(obj)}.`);
+        }
+        return;
+      }
+      case 'swap': {
+        const a = yield* this.eval(s.a, env), b = yield* this.eval(s.b, env);
+        yield* this.assign(s.a, b, env);
+        yield* this.assign(s.b, a, env);
+        return;
+      }
+      case 'after': {
+        const n = yield* this.eval(s.e, env);
+        if (typeof n !== 'number' || n < 0) runtimeError(s.e.s, `\`after\` needs a number of seconds, but got ${typeName(n)}.`);
+        const self = this, body = s.body;
+        const gen = (function* (): Gen<Sig> {
+          yield { wait: n };
+          return yield* self.block(body, env);
+        })();
+        this.tasks.push({ gen, wakeAt: 0, perFrame: false, forever: 0, done: false });
+        return;
+      }
+      case 'waituntil':
+        while (!truthy(yield* this.eval(s.e, env))) yield 'frame';
+        return;
+      case 'save': {
+        const found = env.find(s.name);
+        if (!found) this.unknown(s.name, s.s, env);
+        let json: string;
+        try { json = JSON.stringify(toSaved(found.vars.get(s.name)!)); } catch (err) {
+          runtimeError(s.s, `\`${s.name}\` is ${typeName(found.vars.get(s.name)!)}, which can't be saved.`, 'Numbers, text, true/false, lists and records can be saved.');
+        }
+        this.host.save?.(s.name, json);
+        return;
+      }
+      case 'load': {
+        const raw = this.host.load?.(s.name);
+        if (raw == null) return;
+        try { this.setVar(s.name, fromSaved(JSON.parse(raw)), env); } catch { /* a broken save is ignored */ }
+        return;
+      }
+      case 'move': {
+        const things = this.thingsOf(yield* this.eval(s.target, env), s.target.s, false);
+        const x = this.num(yield* this.eval(s.x, env), s.x.s, 'move'), y = this.num(yield* this.eval(s.y, env), s.y.s, 'move');
+        for (const t of things) {
+          if (s.mode === 'by') { t.x += x; t.y += y; } else { t.x = x; t.y = y; }
+        }
+        return;
+      }
+      case 'turn': {
+        const things = this.thingsOf(yield* this.eval(s.target, env), s.target.s, false);
+        const a = this.num(yield* this.eval(s.e, env), s.e.s, 'turn');
+        for (const t of things) t.angle = s.mode === 'by' ? t.angle + a : a;
+        return;
+      }
     }
+  }
+
+  /** Built-ins that need the host or the picture. */
+  hostBuiltins() {
+    const g = this.globals.vars;
+    g.set('ask', new Builtin('ask', (args, fail) => {
+      if (args.length > 1) fail('`ask` needs one question.', 'Like `set name to ask("What is your name?")`.');
+      const answer = this.host.ask ? this.host.ask(args.length ? textOf(args[0]) : '') : null;
+      return answer;
+    }));
+    g.set('measure', new Builtin('measure', (args, fail) => {
+      if (args.length < 1 || args.length > 2) fail('`measure` needs text and, if you like, a size.', 'Like `measure("Score", 20)`.');
+      const size = args[1] === undefined ? 20 : args[1];
+      if (typeof size !== 'number') return fail(`The size has to be a number, but got ${typeName(size)}.`);
+      return this.world.measure(textOf(args[0]), size);
+    }));
+    g.set('direction', new Builtin('direction', (args, fail) => {
+      const [a, b] = args;
+      if (args.length !== 2 || !(a instanceof Thing) || !(b instanceof Thing)) return fail('`direction` needs two shapes.', 'Like `direction(enemy, player)`. It gives back the angle from the first to the second.');
+      return (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+    }));
+    g.set('nearest', new Builtin('nearest', (args, fail) => {
+      const [a, l] = args;
+      if (args.length !== 2 || !(a instanceof Thing) || !Array.isArray(l)) return fail('`nearest` needs a shape and a list of shapes.', 'Like `nearest(player, enemies)`.');
+      let best: Thing | null = null, bd = Infinity;
+      for (const t of l) {
+        if (!(t instanceof Thing)) return fail('Every item in the list has to be a shape.');
+        if (t === a || t.removed) continue;
+        const d = Math.hypot(t.x - a.x, t.y - a.y);
+        if (d < bd) { bd = d; best = t; }
+      }
+      return best;
+    }));
   }
 
   noGraphics(sp: Span): never {
@@ -550,6 +692,32 @@ export class Runner {
         this.world.add(t);
         return t;
       }
+      case 'lambda':
+        return new Lambda(e.params, e.body, env);
+      case 'isa': {
+        const v = yield* this.eval(e.v, env);
+        return kindOf(v) === e.kind;
+      }
+      case 'between': {
+        const v = yield* this.eval(e.v, env), lo = yield* this.eval(e.lo, env), hi = yield* this.eval(e.hi, env);
+        for (const [x, sp] of [[v, e.v.s], [lo, e.lo.s], [hi, e.hi.s]] as const) {
+          if (typeof x !== 'number') runtimeError(sp, `\`between\` compares numbers, but this is ${typeName(x)}.`);
+        }
+        return (v as number) >= Math.min(lo as number, hi as number) && (v as number) <= Math.max(lo as number, hi as number);
+      }
+      case 'comp': {
+        const l = yield* this.eval(e.list, env);
+        const items = typeof l === 'string' ? [...l] : l instanceof Rec ? [...l.m.keys()] : l;
+        if (!Array.isArray(items)) runtimeError(e.list.s, `\`for each\` needs a list, but got ${typeName(l)}.`);
+        const local = new Env(env);
+        const out: Value[] = [];
+        for (const it of items) {
+          local.vars.set(e.name, it);
+          if (e.cond && !truthy(yield* this.eval(e.cond, local))) continue;
+          out.push(yield* this.eval(e.item, local));
+        }
+        return out;
+      }
     }
   }
 
@@ -593,19 +761,32 @@ export class Runner {
 
   *call(fn: Value, args: Value[], e: Extract<Expr, { k: 'call' }>): Gen<Value> {
     const name = e.fn.k === 'var' ? e.fn.name : e.fn.k === 'prop' ? e.fn.name : 'this';
-    if (fn instanceof Builtin) return fn.fn(args, (msg, hint) => runtimeError(e.s, msg, hint));
+    return yield* this.callValue(fn, args, e.s, name, e.fn.s);
+  }
+
+  /** Calls any instructions value: the story's own, quick `given` ones, or built-ins. */
+  *callValue(fn: Value, args: Value[], sp: Span, name = 'this', fnSpan: Span = sp): Gen<Value> {
+    const fail = (msg: string, hint?: string) => runtimeError(sp, msg, hint);
+    if (fn instanceof Builtin) return fn.fn(args, fail);
+    if (fn instanceof GenBuiltin) return (yield* fn.gen(args, (f, a) => this.callValue(f, a, sp, 'instructions') as Generator<unknown, Value, unknown>, fail) as Gen<Value>);
+    if (fn instanceof Lambda) {
+      if (args.length !== fn.params.length) runtimeError(sp, `These quick instructions need ${fn.params.length} input${fn.params.length === 1 ? '' : 's'} (${fn.params.join(', ')}), but got ${args.length}.`);
+      const local = new Env(fn.closure as Env);
+      fn.params.forEach((p, i) => local.vars.set(p, args[i]));
+      return yield* this.eval(fn.body, local);
+    }
     if (!(fn instanceof Fn)) {
-      runtimeError(e.fn.s, `\`${name}\` is ${typeName(fn)}, not instructions, so it can't be used with ( ).`,
+      runtimeError(fnSpan, `\`${name}\` is ${typeName(fn)}, not instructions, so it can't be used with ( ).`,
         fn instanceof Thing || fn instanceof Rec ? `To read a property, write ${name}'s x.` : undefined);
     }
     const params = fn.def.params;
     if (args.length !== params.length) {
-      runtimeError(e.s, `\`${fn.def.name}\` needs ${params.length} input${params.length === 1 ? '' : 's'}${params.length ? ` (${params.join(', ')})` : ''}, but got ${args.length}.`,
+      runtimeError(sp, `\`${fn.def.name}\` needs ${params.length} input${params.length === 1 ? '' : 's'}${params.length ? ` (${params.join(', ')})` : ''}, but got ${args.length}.`,
         params.length ? `Like ${fn.def.name}(${params.join(', ')}).` : `Like ${fn.def.name}().`);
     }
     if (++this.depth > 300) {
       this.depth = 0;
-      runtimeError(e.s, `\`${fn.def.name}\` went more than 300 calls deep, so it probably never stops.`, 'Make sure there is an `if` that gives back a value without calling it again. Once allows 300 calls inside each other.');
+      runtimeError(sp, `\`${fn.def.name}\` went more than 300 calls deep, so it probably never stops.`, 'Make sure there is an `if` that gives back a value without calling it again. Once allows 300 calls inside each other.');
     }
     const local = new Env(fn.closure as Env);
     params.forEach((p, i) => local.vars.set(p, args[i]));
@@ -634,6 +815,8 @@ export class Runner {
         const bs = this.thingsOf(b, e.b.s, true);
         return as.some((x) => bs.some((y) => this.world.touches(x, y)));
       }
+      case 'in':
+        return this.binary('contains', b, a, { ...e, a: e.b, b: e.a });
       case 'contains': {
         if (Array.isArray(a)) return a.some((x) => equals(x, b));
         if (typeof a === 'string') return a.includes(textOf(b));

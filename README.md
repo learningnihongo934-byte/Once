@@ -2,7 +2,7 @@
 
 **Once** is a little programming language for moving pictures. It reads like English, has friendly error messages, and comes with drawing, keyboard and mouse input, sound and simple physics built in.
 
-Try it in your browser: **https://once.rennko.tech** (the playground), learn it step by step at **[/learn](https://once.rennko.tech/learn)** (23 interactive lessons that end with you building a top-down shooter), and look things up in **[the docs](https://once.rennko.tech/docs.html)**.
+Try it in your browser: **https://once.rennko.tech** (the playground), learn it step by step at **[/learn](https://once.rennko.tech/learn)** (24 interactive lessons that end with you building a top-down shooter), and look things up in **[the docs](https://once.rennko.tech/docs.html)**.
 
 ```
 -- Bouncing balls
@@ -34,9 +34,14 @@ end
 | `when key "space" is pressed`, `when mouse is clicked`, `when ball touches edge` | Events |
 | `holding "left"`, `ball touches paddle`, `ball's x` | Questions |
 | `play note "C4" for 0.5`, `play sound "coin"` | Sound |
+| `choose x` / `case ...`, `try ... otherwise`, `fail`, `check` | Matching and handling problems |
+| `given n: n * 2`, `map`, `filter`, `[x * 2 for each x in xs]` | Quick instructions and list tools |
+| `is a number`, `is between 1 and 10`, `is in list` | Checking values |
+| `after 2 seconds`, `wait until ready`, `save best` / `load best` | Timing and saving |
+| `move player by 4, 0`, `turn box by 15`, `nearest(player, enemies)` | Moving and aiming |
 | `wait 1 second`, `the end` | Time |
 
-Lists count from 1, angles are in degrees, and the picture is 480 by 360 with `0, 0` at the top left.
+Once has 35 statements, 15 operators and 72 built-in instructions, about the size of Python's core. Lists count from 1, angles are in degrees, and the picture is 480 by 360 with `0, 0` at the top left.
 
 ## How it is built
 

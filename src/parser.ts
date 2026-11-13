@@ -6,15 +6,21 @@ export const RESERVED = new Set([
   'set', 'to', 'change', 'by', 'say', 'if', 'then', 'otherwise', 'else', 'end', 'repeat', 'times', 'while',
   'until', 'forever', 'for', 'each', 'in', 'from', 'give', 'back', 'stop', 'skip', 'wait', 'every', 'when',
   'draw', 'background', 'clear', 'play', 'add', 'remove', 'hide', 'show', 'new', 'and', 'or', 'not', 'is',
-  'random', 'any', 'holding', 'true', 'false', 'nothing', 'mod', 'of', 'touches', 'contains',
+  'random', 'any', 'holding', 'true', 'false', 'nothing', 'mod', 'of', 'touches', 'contains', 'given', 'case',
 ]);
 
 const STATEMENTS = ['say', 'set', 'change', 'if', 'repeat', 'for', 'to', 'give', 'stop', 'skip', 'wait', 'every',
-  'when', 'draw', 'background', 'clear', 'play', 'add', 'remove', 'hide', 'show', 'new'];
+  'when', 'draw', 'background', 'clear', 'play', 'add', 'remove', 'hide', 'show', 'new', 'choose', 'try', 'fail',
+  'check', 'forget', 'swap', 'after', 'save', 'load', 'move', 'turn'];
+
+/** Statement words that are not reserved, so they still work as names (`set move to 3`, `check(x)`). */
+const SOFT = new Set(['choose', 'try', 'fail', 'check', 'do', 'forget', 'swap', 'after', 'save', 'load', 'move', 'turn']);
 
 /** Words people bring from other languages, and what Once says instead. */
 const FROM_ELSEWHERE: Record<string, string> = {
   print: 'say', log: 'say', echo: 'say', puts: 'say', console: 'say', return: 'give back', def: 'to', function: 'to',
+  raise: 'fail', throw: 'fail', assert: 'check', pass: 'do nothing', del: 'forget', match: 'choose', switch: 'choose',
+  except: 'otherwise', catch: 'otherwise', lambda: 'given',
   func: 'to', fn: 'to', let: 'set', var: 'set', const: 'set', loop: 'repeat', elif: 'otherwise if', break: 'stop',
   continue: 'skip', sleep: 'wait', exit: 'the end', while: 'repeat while',
 };
@@ -33,7 +39,8 @@ const KIND_ALIASES: Record<string, string> = { square: 'box', rectangle: 'box', 
 const NOTE_CLAUSES: Schema = { for: [1, 1], wave: [1, 1], volume: [1, 1] };
 const SOUND_CLAUSES: Schema = { volume: [1, 1] };
 const END_WORDS = new Set(['if', 'repeat', 'for', 'to', 'every', 'when', 'each']);
-const VALUE_WORDS = new Set(['true', 'false', 'nothing', 'random', 'any', 'holding', 'not', 'new']);
+const VALUE_WORDS = new Set(['true', 'false', 'nothing', 'random', 'any', 'holding', 'not', 'new', 'given']);
+const KIND_WORDS = new Set(['number', 'text', 'truth', 'list', 'record', 'shape', 'thing', 'instructions', 'nothing']);
 
 export function parse(src: string): Program {
   const p = new Parser(lex(src));
@@ -147,6 +154,14 @@ class Parser {
   statement(): Stmt {
     const t = this.peek();
     if (t.t !== 'id') return this.exprStatement();
+    if (SOFT.has(t.v)) {
+      const n = this.peek(1);
+      const usedAsName = n.t === 'poss' || (n.t === 'op' && ['(', '.', '[', '='].includes(n.v));
+      if (!usedAsName) {
+        const s = this.softStatement(t);
+        if (s) return s;
+      }
+    }
     switch (t.v) {
       case 'set': {
         this.next();
@@ -194,6 +209,7 @@ class Parser {
         break;
       case 'wait': {
         this.next();
+        if (this.eatWord('until')) return { k: 'waituntil', e: this.expr(), s: this.spanFrom(t) };
         const e = this.expr();
         if (!this.eatWord('seconds') && !this.eatWord('second')) {
           if (this.peek().t === 'id' && /^(sec|secs|s|ms|frames?|minutes?)$/.test(this.peek().v)) {
@@ -240,6 +256,8 @@ class Parser {
       case 'show':
         this.next();
         return { k: t.v as 'hide' | 'show', e: this.expr(), s: this.spanFrom(t) };
+      case 'case':
+        syntaxError(span(t), '`case` only goes inside a `choose` block.', 'Like:\nchoose day\n  case "sat", "sun"\n    say "weekend"\nend');
       case 'end':
         syntaxError(span(t), 'There is an extra `end` here. Nothing is open for it to close.', 'Check that each `end` matches an if, repeat, for each, to, every or when above it.');
       case 'otherwise':
@@ -254,6 +272,115 @@ class Parser {
         syntaxError(span(t), '`times` goes after a number in a repeat, like `repeat 3 times`.');
     }
     return this.exprStatement();
+  }
+
+  softStatement(t: Token): Stmt | null {
+    switch (t.v) {
+      case 'choose': return this.choose();
+      case 'try': return this.tryStatement();
+      case 'fail':
+        this.next();
+        if (this.atLineEnd()) syntaxError(span(t), '`fail` needs a message.', 'Like `fail "The level file is broken"`.');
+        return { k: 'fail', value: this.expr(), s: this.spanFrom(t) };
+      case 'check':
+        this.next();
+        if (this.atLineEnd()) syntaxError(span(t), '`check` needs something that should be true.', 'Like `check lives is at least 0`.');
+        return { k: 'check', e: this.expr(), s: this.spanFrom(t) };
+      case 'do':
+        if (!this.isWord('nothing', 1)) return null;
+        this.next(); this.next();
+        return { k: 'pass', s: this.spanFrom(t) };
+      case 'forget':
+        this.next();
+        return { k: 'forget', target: this.target(), s: this.spanFrom(t) };
+      case 'swap': {
+        this.next();
+        const a = this.target();
+        this.expectWord('and', undefined, 'Write it like `swap a and b`.');
+        const b = this.target();
+        return { k: 'swap', a, b, s: this.spanFrom(t) };
+      }
+      case 'after': {
+        this.next();
+        const e = this.expr();
+        if (!this.eatWord('seconds') && !this.eatWord('second')) syntaxError(span(this.peek()), 'After the number, write `seconds`.', 'Like `after 2 seconds`.');
+        const sp = this.spanFrom(t);
+        this.headerEnd(t);
+        const [loops, inFn] = [this.loops, this.inFn];
+        this.loops = 0; this.inFn = false;
+        const body = this.block(t, ['end']);
+        this.loops = loops; this.inFn = inFn;
+        this.closeBlock(t);
+        return { k: 'after', e, body, s: sp };
+      }
+      case 'save':
+      case 'load': {
+        this.next();
+        const n = this.name(t.v === 'save' ? 'value to save' : 'value to load');
+        return { k: t.v, name: n.v, s: this.spanFrom(t) };
+      }
+      case 'move':
+      case 'turn': {
+        this.next();
+        const target = this.postfix();
+        let mode: 'by' | 'to';
+        if (this.eatWord('by')) mode = 'by';
+        else { this.expectWord('to', `After \`${t.v} ...\`, write \`by\` or \`to\`.`, t.v === 'move' ? 'Like `move player by 4, 0` or `move player to 240, 180`.' : 'Like `turn box by 15` or `turn box to 90`.'); mode = 'to'; }
+        if (t.v === 'turn') return { k: 'turn', target, mode, e: this.expr(), s: this.spanFrom(t) };
+        const x = this.expr();
+        this.expectOp(',', undefined, 'Moving needs two numbers, across and down, like `move player by 4, 0`.');
+        const y = this.expr();
+        return { k: 'move', target, mode, x, y, s: this.spanFrom(t) };
+      }
+    }
+    return null;
+  }
+
+  choose(): Stmt {
+    const start = this.next();
+    const subject = this.expr();
+    const sp = this.spanFrom(start);
+    this.headerEnd(start);
+    const cases: { vals: Expr[]; body: Stmt[] }[] = [];
+    let els: Stmt[] | null = null;
+    const stops = ['case', 'otherwise', 'else', 'end'];
+    for (;;) {
+      this.skipNl();
+      const t = this.peek();
+      if (t.t === 'id' && t.v === 'case') {
+        this.next();
+        if (els) syntaxError(span(t), 'This `case` comes after `otherwise`, so it can never happen.', 'Put `otherwise` last.');
+        const vals = [this.additive()];
+        while (this.eatOp(',') || this.eatWord('or')) vals.push(this.additive());
+        this.eatWord('then');
+        this.headerEnd(t);
+        cases.push({ vals, body: this.block(start, stops) });
+      } else if (t.t === 'id' && (t.v === 'otherwise' || t.v === 'else')) {
+        this.next();
+        if (els) syntaxError(span(t), 'This `choose` already has an `otherwise`.');
+        this.headerEnd(t);
+        els = this.block(start, stops);
+      } else if (t.t === 'id' && t.v === 'end') break;
+      else if (t.t === 'eof') syntaxError(span(start), `This \`choose\` on line ${start.line} is never closed with \`end\`.`);
+      else syntaxError(span(t), 'Inside `choose`, each choice starts with `case`.', 'Like:\nchoose day\n  case "sat", "sun"\n    say "weekend"\n  otherwise\n    say "work"\nend');
+    }
+    if (!cases.length) syntaxError(span(start), 'This `choose` has no `case` lines.');
+    this.closeBlock(start);
+    return { k: 'choose', subject, cases, els, s: sp };
+  }
+
+  tryStatement(): Stmt {
+    const start = this.next();
+    this.headerEnd(start);
+    const body = this.block(start, ['otherwise', 'else', 'end']);
+    let handler: Stmt[] | null = null;
+    if (this.isWord('otherwise') || this.isWord('else')) {
+      const o = this.next();
+      this.headerEnd(o);
+      handler = this.block(start, ['end']);
+    }
+    this.closeBlock(start);
+    return { k: 'try', body, handler, s: span(start) };
   }
 
   exprStatement(): Stmt {
@@ -527,13 +654,37 @@ class Parser {
     let op: string | null = null;
     if (t.t === 'id' && t.v === 'is') {
       this.next();
-      if (this.eatWord('not')) op = 'ne';
-      else if (this.eatWord('above')) op = 'gt';
+      const neg = this.eatWord('not');
+      const wrap = (e: Expr): Expr => (neg ? { k: 'un', op: 'not', a: e, s: e.s } : e);
+      // Type checks: `x is a number`, `x is text`.
+      const art = this.isWord('a') || this.isWord('an');
+      const kindTok = this.peek(art ? 1 : 0);
+      if (kindTok.t === 'id' && (art ? KIND_WORDS.has(kindTok.v) : kindTok.v === 'text' && this.peek(1).t !== 'op' && this.peek(1).t !== 'poss')) {
+        if (art) this.next();
+        this.next();
+        return wrap({ k: 'isa', v: a, kind: kindTok.v === 'shape' || kindTok.v === 'thing' ? 'shape' : kindTok.v, s: this.spanFrom(t) });
+      }
+      if (this.eatWord('between')) {
+        const lo = this.additive();
+        this.expectWord('and', undefined, 'Write it like `x is between 1 and 10`.');
+        const hi = this.additive();
+        return wrap({ k: 'between', v: a, lo, hi, s: join(a.s, hi.s, t) });
+      }
+      if (this.eatWord('in')) {
+        const b = this.additive();
+        return wrap({ k: 'bin', op: 'in', a, b, s: join(a.s, b.s, t) });
+      }
+      if (this.eatWord('above')) op = 'gt';
       else if (this.eatWord('below')) op = 'lt';
       else if (this.isWord('more') || this.isWord('greater') || this.isWord('bigger')) { this.next(); this.expectWord('than'); op = 'gt'; }
       else if (this.isWord('less') || this.isWord('fewer') || this.isWord('smaller')) { this.next(); this.expectWord('than'); op = 'lt'; }
       else if (this.isWord('at') && (this.isWord('least', 1) || this.isWord('most', 1))) { this.next(); op = this.next().v === 'least' ? 'ge' : 'le'; }
       else op = 'eq';
+      const b = this.additive();
+      const e: Expr = { k: 'bin', op, a, b, s: join(a.s, b.s, t) };
+      if (!neg) return e;
+      if (op === 'eq') return { ...e, op: 'ne' };
+      return wrap(e);
     } else if (t.t === 'op' && ['=', '==', '!=', '<', '>', '<=', '>='].includes(t.v)) {
       this.next();
       op = ({ '=': 'eq', '==': 'eq', '!=': 'ne', '<': 'lt', '>': 'gt', '<=': 'le', '>=': 'ge' } as Record<string, string>)[t.v];
@@ -643,6 +794,17 @@ class Parser {
         while (!this.isOp(']')) {
           if (this.peek().t === 'eof') break;
           items.push(this.expr());
+          // [x * 2 for each x in xs if x is above 1]
+          if (items.length === 1 && this.isWord('for')) {
+            this.next();
+            this.eatWord('each');
+            const name = this.name('item').v;
+            this.expectWord('in', undefined, 'Write it like `[x * 2 for each x in numbers]`.');
+            const list = this.expr();
+            const cond = this.eatWord('if') ? this.expr() : null;
+            this.expectOp(']', undefined, 'A list made with `for each` ends with `]`.');
+            return { k: 'comp', item: items[0], name, list, cond, s: this.spanFrom(t) };
+          }
           if (!this.eatOp(',')) break;
         }
         this.expectOp(']', `I expected \`]\` to close the list started on line ${t.line}, but found ${describe(this.peek())}.`, 'Items in a list are separated by commas.');
@@ -682,6 +844,17 @@ class Parser {
           this.next();
           this.expectWord('of', undefined, 'Write it like `any of colors`, to pick one at random.');
           return { k: 'any', list: this.unary(), s: this.spanFrom(t) };
+        }
+        case 'given': {
+          this.next();
+          const params: string[] = [];
+          while (!this.isOp(':')) {
+            if (params.length && !this.eatWord('and') && !this.eatOp(',')) syntaxError(span(this.peek()), 'Separate the inputs with `and`, then end with `:`.', 'Like `given a and b: a + b`.');
+            params.push(this.name('input').v);
+          }
+          this.next();
+          const body = this.expr();
+          return { k: 'lambda', params, body, s: this.spanFrom(t) };
         }
         case 'holding': {
           this.next();

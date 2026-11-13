@@ -17,7 +17,11 @@ export type Expr =
   | { k: 'index'; obj: Expr; idx: Expr; s: Span }
   | { k: 'random'; lo: Expr; hi: Expr; s: Span }
   | { k: 'any'; list: Expr; s: Span }
-  | { k: 'new'; kind: string; content: Expr | null; clauses: Clause[]; s: Span };
+  | { k: 'new'; kind: string; content: Expr | null; clauses: Clause[]; s: Span }
+  | { k: 'lambda'; params: string[]; body: Expr; s: Span }
+  | { k: 'isa'; v: Expr; kind: string; s: Span }
+  | { k: 'between'; v: Expr; lo: Expr; hi: Expr; s: Span }
+  | { k: 'comp'; item: Expr; name: string; list: Expr; cond: Expr | null; s: Span };
 
 export type Stmt =
   | { k: 'set'; target: Expr; value: Expr; s: Span }
@@ -41,6 +45,18 @@ export type Stmt =
   | { k: 'add'; value: Expr; target: Expr; s: Span }
   | { k: 'remove'; value: Expr; from: Expr | null; s: Span }
   | { k: 'hide' | 'show'; e: Expr; s: Span }
-  | { k: 'expr'; e: Expr; s: Span };
+  | { k: 'expr'; e: Expr; s: Span }
+  | { k: 'choose'; subject: Expr; cases: { vals: Expr[]; body: Stmt[] }[]; els: Stmt[] | null; s: Span }
+  | { k: 'try'; body: Stmt[]; handler: Stmt[] | null; s: Span }
+  | { k: 'fail'; value: Expr; s: Span }
+  | { k: 'check'; e: Expr; s: Span }
+  | { k: 'pass'; s: Span }
+  | { k: 'forget'; target: Expr; s: Span }
+  | { k: 'swap'; a: Expr; b: Expr; s: Span }
+  | { k: 'after'; e: Expr; body: Stmt[]; s: Span }
+  | { k: 'waituntil'; e: Expr; s: Span }
+  | { k: 'save' | 'load'; name: string; s: Span }
+  | { k: 'move'; target: Expr; mode: 'by' | 'to'; x: Expr; y: Expr; s: Span }
+  | { k: 'turn'; target: Expr; mode: 'by' | 'to'; e: Expr; s: Span };
 
 export interface Program { body: Stmt[] }

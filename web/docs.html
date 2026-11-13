@@ -33,6 +33,7 @@
       <li><a href="#listening">Listening</a></li>
       <li><a href="#sounds">Sounds</a></li>
       <li><a href="#time">Time, and the end</a></li>
+      <li><a href="#more">More tools</a></li>
       <li><a href="#appendix">Reference</a></li>
     </ol>
   </nav>
@@ -274,6 +275,95 @@ when ball touches edge
 end</pre></div>
   </section>
 
+  <section class="chapter" id="more">
+    <h2>11. More tools</h2>
+    <p>These are the bigger tools, the kind Python has. You can write plenty of games without them, but they make larger programs shorter and clearer.</p>
+    <h3>choose and case</h3>
+    <p><code>choose</code> picks steps by value, like <code>match</code> in Python. Several values can share a case.</p>
+    <div class="listing"><pre class="once">set day to "sun"
+choose day
+  case "sat", "sun"
+    say "Weekend!"
+  case "fri"
+    say "Almost there"
+  otherwise
+    say "A work day"
+end</pre></div>
+    <h3>Handling problems: try, fail, check</h3>
+    <p><code>try ... otherwise ... end</code> runs some steps, and if something goes wrong, runs the <code>otherwise</code> steps instead of stopping. The message is in <code>problem</code>. <code>fail</code> makes your own error, and <code>check</code> stops the program when something that should be true isn't.</p>
+    <div class="listing"><pre class="once">try
+  set n to number("twelve")
+otherwise
+  say "That didn't work: {problem}"
+end
+
+to withdraw amount
+  if amount is above 100 then fail "Not enough money"
+  give back 100 - amount
+end
+
+check withdraw(30) is 70
+say "All good"</pre></div>
+    <h3>Quick instructions and list tools</h3>
+    <p><code>given</code> writes small instructions inside a line (a lambda). They pair with <code>map</code>, <code>filter</code>, <code>reduce</code>, <code>sortby</code>, <code>some</code> and <code>all</code>. A list can also be built with <code>for each</code> inside brackets.</p>
+    <div class="listing"><pre class="once">set scores to [12, 7, 30, 18]
+say map(scores, given s: s * 2)
+say filter(scores, given s: s is above 10)
+say reduce(scores, given total and s: total + s, 0)
+say sortby(["pear", "fig", "banana"], given w: length(w))
+say [n * n for each n in range(1, 6) if n mod 2 is 1]
+
+set double to given n: n * 2
+say double(21)</pre></div>
+    <h3>Checking values</h3>
+    <p><code>is a</code> checks the kind of a value: <code>number</code>, <code>text</code>, <code>truth</code>, <code>list</code>, <code>record</code>, <code>shape</code>, <code>instructions</code> or <code>nothing</code>. <code>is between</code> and <code>is in</code> read naturally, and <code>type(x)</code> gives the kind as text.</p>
+    <div class="listing"><pre class="once">set x to 7
+if x is a number and x is between 1 and 10 then say "small number"
+if "owl" is in ["cat", "owl"] then say "found the owl"
+say type([1, 2])</pre></div>
+    <h3>Moving and aiming</h3>
+    <p><code>move</code> and <code>turn</code> change shapes directly. <code>direction</code> gives the angle from one shape to another, and <code>nearest</code> finds the closest shape in a list.</p>
+    <div class="listing"><pre class="once">set player to new box at 240, 180 size 30 color "#0078d4"
+set coins to [new circle at 60, 60 size 20 color "gold", new circle at 400, 300 size 20 color "gold"]
+
+every frame
+  set c to nearest(player, coins)
+  if c is not nothing
+    set a to direction(player, c)
+    move player by cos(a) * 2, sin(a) * 2
+    turn player by 3
+    if player touches c
+      remove c
+      remove c from coins
+    end
+  end
+end</pre></div>
+    <h3>Time: after and wait until</h3>
+    <div class="listing"><pre class="once">set ready to false
+after 1 second
+  set ready to true
+end
+say "Waiting..."
+wait until ready
+say "Ready!"</pre></div>
+    <h3>Saving, asking, and small helpers</h3>
+    <p><code>save</code> remembers a value even after the page is closed, and <code>load</code> gets it back, which is perfect for high scores. <code>ask("Your name?")</code> asks the person a question. <code>swap</code> trades two values, <code>forget</code> removes one, and <code>do nothing</code> fills an empty block.</p>
+    <div class="listing"><pre class="once">set best to 0
+load best
+say "Best so far: {best}"
+set best to best + 1
+save best
+
+set a to "left"
+set b to "right"
+swap a and b
+say "{a} {b}"
+
+set hero to {name: "Mo", shield: true}
+forget hero's shield
+say hero</pre></div>
+  </section>
+
   <section class="chapter" id="appendix">
     <h2>Reference: built-in instructions</h2>
     <p>Angles are in degrees. Lists count from one.</p>
@@ -290,9 +380,20 @@ end</pre></div>
       <tr><td><code>range(a, b)</code>, <code>sort(list)</code>, <code>reverse(list)</code>, <code>find(list, x)</code></td><td>A list of numbers; sorted; backwards; where x is (0 if missing).</td></tr>
       <tr><td><code>keys(record)</code></td><td>The names inside a record.</td></tr>
       <tr><td><code>rgb(r, g, b)</code>, <code>hsl(h, s, l)</code></td><td>A color made from numbers.</td></tr>
+      <tr><td><code>exp</code>, <code>log</code>, <code>sign</code>, <code>lerp</code>, <code>average</code>, <code>asin</code>, <code>acos</code>, <code>atan</code></td><td>More math. <code>lerp(a, b, t)</code> is the point part of the way from a to b.</td></tr>
+      <tr><td><code>chance(p)</code>, <code>shuffle(list)</code>, <code>sample(list, n)</code>, <code>randomcolor()</code></td><td>Randomness: true p% of the time, a shuffled copy, n random items, a random color.</td></tr>
+      <tr><td><code>trim</code>, <code>replace</code>, <code>slice</code>, <code>title</code>, <code>count</code>, <code>pad</code></td><td>Text tools. <code>slice</code> and <code>count</code> also work on lists.</td></tr>
+      <tr><td><code>code(letter)</code>, <code>letter(n)</code>, <code>begins(t, s)</code>, <code>ends(t, s)</code></td><td>Letters and numbers; checking how text starts or ends.</td></tr>
+      <tr><td><code>pop</code>, <code>insert</code>, <code>unique</code>, <code>flatten</code>, <code>zip</code>, <code>fill</code>, <code>copy</code></td><td>List tools.</td></tr>
+      <tr><td><code>values(record)</code>, <code>merge(r1, r2)</code></td><td>Record tools.</td></tr>
+      <tr><td><code>map</code>, <code>filter</code>, <code>reduce</code>, <code>sortby</code>, <code>some</code>, <code>all</code></td><td>List tools that take instructions, usually written with <code>given</code>.</td></tr>
+      <tr><td><code>type(x)</code>, <code>ask(question)</code>, <code>now()</code></td><td>The kind of a value; a question for the person; the date and time.</td></tr>
+      <tr><td><code>direction(a, b)</code>, <code>nearest(shape, list)</code>, <code>measure(text, size)</code>, <code>mix(c1, c2, t)</code></td><td>Game helpers: angle between shapes, closest shape, text width, blending two colors.</td></tr>
     </table>
     <h3>Names that are always there</h3>
-    <p><code>width</code> and <code>height</code> of the preview, <code>mouse</code>, <code>edge</code>, <code>gravity</code>, <code>time</code>, <code>frame</code> and <code>pi</code>.</p>
+    <p><code>width</code> and <code>height</code> of the preview, <code>mouse</code>, <code>edge</code>, <code>gravity</code>, <code>time</code>, <code>frame</code>, <code>pi</code>, and <code>problem</code> inside a <code>try</code>.</p>
+    <h3>By the numbers</h3>
+    <p>Once has 35 statements, 15 operators and 72 built-in instructions, about the same as Python's core (35 keywords and 71 built-in functions).</p>
     <h3>When something goes wrong</h3>
     <p>Once explains mistakes in plain words. It shows the line, underlines the part it got stuck on, and often guesses what you meant:</p>
     <div class="listing"><pre class="once">set score to 0

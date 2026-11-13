@@ -1,0 +1,2 @@
+-- error: `case` only goes inside a `choose`
+case 1

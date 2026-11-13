@@ -5,6 +5,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
 
 // src/cli.ts
 var import_node_fs = require("node:fs");
+var import_node_os = require("node:os");
 var import_node_path = require("node:path");
 
 // src/errors.ts
@@ -81,6 +82,19 @@ var Fn = class {
     this.closure = closure;
   }
 };
+var Lambda = class {
+  constructor(params, body, closure) {
+    this.params = params;
+    this.body = body;
+    this.closure = closure;
+  }
+};
+var GenBuiltin = class {
+  constructor(name, gen) {
+    this.name = name;
+    this.gen = gen;
+  }
+};
 var Builtin = class {
   constructor(name, fn) {
     this.name = name;
@@ -137,7 +151,8 @@ function typeName(v) {
   if (v instanceof Rec) return "a record";
   if (v instanceof Thing) return `a ${v.kind}`;
   if (v instanceof Fn) return `the instructions \`${v.def.name}\``;
-  if (v instanceof Builtin) return `the built-in instructions \`${v.name}\``;
+  if (v instanceof Builtin || v instanceof GenBuiltin) return `the built-in instructions \`${v.name}\``;
+  if (v instanceof Lambda) return "quick instructions (given ...)";
   if (v instanceof Edge) return "the edge";
   return "something";
 }
@@ -156,7 +171,8 @@ function textOf(v, nested = false) {
   if (v instanceof Rec) return "{" + [...v.m].map(([k, x]) => `${k}: ${textOf(x, true)}`).join(", ") + "}";
   if (v instanceof Thing) return v.kind === "text" ? `a text "${v.text}"` : `a ${v.kind} at ${fmtNum(v.x)}, ${fmtNum(v.y)}`;
   if (v instanceof Fn) return `the instructions ${v.def.name}`;
-  if (v instanceof Builtin) return `the built-in ${v.name}`;
+  if (v instanceof Builtin || v instanceof GenBuiltin) return `the built-in ${v.name}`;
+  if (v instanceof Lambda) return `the instructions given ${v.params.join(" and ")}`;
   if (v instanceof Edge) return "the edge";
   return "?";
 }
@@ -266,6 +282,42 @@ var COLOR_NAMES = [
   "burlywood",
   "transparent"
 ];
+function kindOf(v) {
+  if (v === null) return "nothing";
+  if (typeof v === "number") return "number";
+  if (typeof v === "string") return "text";
+  if (typeof v === "boolean") return "truth";
+  if (Array.isArray(v)) return "list";
+  if (v instanceof Rec) return "record";
+  if (v instanceof Thing) return "shape";
+  if (v instanceof Edge) return "edge";
+  return "instructions";
+}
+function toSaved(v) {
+  if (v === null || typeof v === "number" || typeof v === "string" || typeof v === "boolean") return v;
+  if (Array.isArray(v)) return v.map(toSaved);
+  if (v instanceof Rec) return { $record: Object.fromEntries([...v.m].map(([k, x]) => [k, toSaved(x)])) };
+  throw new Error(kindOf(v));
+}
+function fromSaved(j) {
+  if (j === null || typeof j === "number" || typeof j === "string" || typeof j === "boolean") return j;
+  if (Array.isArray(j)) return j.map(fromSaved);
+  if (j && typeof j === "object" && "$record" in j) {
+    const r = new Rec();
+    for (const [k, x] of Object.entries(j.$record)) r.m.set(k, fromSaved(x));
+    return r;
+  }
+  return null;
+}
+function deepCopy(v) {
+  if (Array.isArray(v)) return v.map(deepCopy);
+  if (v instanceof Rec) {
+    const r = new Rec();
+    for (const [k, x] of v.m) r.m.set(k, deepCopy(x));
+    return r;
+  }
+  return v;
+}
 
 // src/stdlib.ts
 function num(v, fn, fail2, what = "a number") {
@@ -375,6 +427,169 @@ var defs = [
   ["hsl", 3, 3, "hsl(200, 60, 50)", (a, f) => {
     const [h, s, l] = a.map((v) => num(v, "hsl", f));
     return `hsl(${fmtNum(h)}, ${fmtNum(s)}%, ${fmtNum(l)}%)`;
+  }],
+  // ---- more math ----
+  ["exp", 1, 1, "exp(1)", ([x], f) => Math.exp(num(x, "exp", f))],
+  ["log", 1, 2, "log(100, 10)", ([x, b], f) => {
+    const n = num(x, "log", f);
+    if (n <= 0) return f("`log` needs a number above zero.");
+    return b === void 0 ? Math.log(n) : Math.log(n) / Math.log(num(b, "log", f));
+  }],
+  ["sign", 1, 1, "sign(-5)", ([x], f) => Math.sign(num(x, "sign", f))],
+  ["lerp", 3, 3, "lerp(0, 100, 0.25)", ([a, b, t], f) => {
+    const p = num(a, "lerp", f);
+    return p + (num(b, "lerp", f) - p) * num(t, "lerp", f);
+  }],
+  ["average", 1, 99, "average([2, 4, 9])", (a, f) => {
+    const n = nums(a, "average", f);
+    return n.reduce((p, q) => p + q, 0) / n.length;
+  }],
+  ["asin", 1, 1, "asin(1)", ([x], f) => Math.asin(num(x, "asin", f)) * 180 / Math.PI],
+  ["acos", 1, 1, "acos(0)", ([x], f) => Math.acos(num(x, "acos", f)) * 180 / Math.PI],
+  ["atan", 1, 1, "atan(1)", ([x], f) => Math.atan(num(x, "atan", f)) * 180 / Math.PI],
+  ["chance", 1, 1, "chance(25)", ([x], f) => Math.random() * 100 < num(x, "chance", f, "a percent")],
+  ["shuffle", 1, 1, "shuffle(cards)", ([x], f) => {
+    const l = [...list(x, "shuffle", f)];
+    for (let i = l.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [l[i], l[j]] = [l[j], l[i]];
+    }
+    return l;
+  }],
+  ["sample", 2, 2, "sample(cards, 3)", ([x, n], f) => {
+    const l = [...list(x, "sample", f)];
+    const k = Math.max(0, Math.min(l.length, Math.floor(num(n, "sample", f))));
+    for (let i = l.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [l[i], l[j]] = [l[j], l[i]];
+    }
+    return l.slice(0, k);
+  }],
+  // ---- more text ----
+  ["trim", 1, 1, 'trim("  hi  ")', ([x], f) => str(x, "trim", f).trim()],
+  ["replace", 3, 3, 'replace("a-b-c", "-", " ")', ([x, a, b], f) => str(x, "replace", f).split(str(a, "replace", f)).join(str(b, "replace", f))],
+  ["slice", 2, 3, "slice(names, 2, 4)", ([x, a, b], f) => {
+    const from = Math.floor(num(a, "slice", f));
+    const len = typeof x === "string" ? [...x].length : list(x, "slice", f).length;
+    const to = b === void 0 ? len : Math.floor(num(b, "slice", f));
+    const lo = from < 0 ? len + from : from - 1, hi = to < 0 ? len + to + 1 : to;
+    if (typeof x === "string") return [...x].slice(Math.max(0, lo), Math.max(0, hi)).join("");
+    return list(x, "slice", f).slice(Math.max(0, lo), Math.max(0, hi));
+  }],
+  ["title", 1, 1, 'title("hello there")', ([x], f) => str(x, "title", f).replace(/\b\p{L}/gu, (c) => c.toUpperCase())],
+  ["count", 2, 2, "count(rolls, 6)", ([x, v], f) => {
+    if (typeof x === "string") {
+      const n = str(v, "count", f);
+      return n ? x.split(n).length - 1 : 0;
+    }
+    return list(x, "count", f).filter((y) => equals(y, v)).length;
+  }],
+  ["code", 1, 1, 'code("A")', ([x], f) => {
+    const t = str(x, "code", f);
+    if (!t) return f("`code` needs a letter.");
+    return t.codePointAt(0);
+  }],
+  ["letter", 1, 1, "letter(65)", ([x], f) => String.fromCodePoint(Math.max(0, Math.floor(num(x, "letter", f))))],
+  ["begins", 2, 2, 'begins(name, "Dr")', ([x, p], f) => str(x, "begins", f).startsWith(str(p, "begins", f))],
+  ["ends", 2, 2, 'ends(file, ".once")', ([x, p], f) => str(x, "ends", f).endsWith(str(p, "ends", f))],
+  ["pad", 2, 3, 'pad(score, 5, "0")', ([x, w, c], f) => textOf(x).padStart(Math.floor(num(w, "pad", f)), c === void 0 ? " " : str(c, "pad", f))],
+  // ---- more lists and records ----
+  ["pop", 1, 1, "pop(stack)", ([x], f) => {
+    const l = list(x, "pop", f);
+    if (!l.length) return f("The list is empty, so there is nothing to pop.");
+    return l.pop();
+  }],
+  ["insert", 3, 3, 'insert(names, 1, "Ada")', ([x, i, v], f) => {
+    const l = list(x, "insert", f);
+    const n = Math.floor(num(i, "insert", f));
+    if (n < 1 || n > l.length + 1) return f(`Position ${n} is outside the list, which has ${l.length} items.`, "Positions count from 1. Use length + 1 to insert at the end.");
+    l.splice(n - 1, 0, v);
+    return l;
+  }],
+  ["unique", 1, 1, "unique([1, 1, 2])", ([x], f) => {
+    const out = [];
+    for (const v of list(x, "unique", f)) if (!out.some((y) => equals(y, v))) out.push(v);
+    return out;
+  }],
+  ["flatten", 1, 1, "flatten([[1, 2], [3]])", ([x], f) => list(x, "flatten", f).flatMap((v) => Array.isArray(v) ? v : [v])],
+  ["zip", 2, 2, "zip(names, scores)", ([a, b], f) => {
+    const p = list(a, "zip", f), q = list(b, "zip", f);
+    return p.slice(0, Math.min(p.length, q.length)).map((v, i) => [v, q[i]]);
+  }],
+  ["fill", 2, 2, "fill(5, 0)", ([n, v], f) => {
+    const k = Math.floor(num(n, "fill", f));
+    if (k < 0 || k > 1e5) return f("`fill` makes between 0 and 100,000 items.");
+    return Array.from({ length: k }, () => deepCopy(v));
+  }],
+  ["copy", 1, 1, "copy(board)", ([x]) => deepCopy(x)],
+  ["values", 1, 1, "values(scores)", ([x], f) => {
+    if (!(x instanceof Rec)) return f(`\`values\` needs a record, but got ${typeName(x)}.`);
+    return [...x.m.values()];
+  }],
+  ["merge", 2, 2, "merge(defaults, options)", ([a, b], f) => {
+    if (!(a instanceof Rec) || !(b instanceof Rec)) return f("`merge` needs two records.");
+    const r = new Rec();
+    for (const [k, v] of a.m) r.m.set(k, v);
+    for (const [k, v] of b.m) r.m.set(k, v);
+    return r;
+  }],
+  // ---- values, time and color ----
+  ["type", 1, 1, "type(x)", ([x]) => kindOf(x)],
+  ["now", 0, 0, "now()", () => {
+    const d = /* @__PURE__ */ new Date();
+    const r = new Rec();
+    const parts = [["year", d.getFullYear()], ["month", d.getMonth() + 1], ["day", d.getDate()], ["weekday", d.getDay() === 0 ? 7 : d.getDay()], ["hour", d.getHours()], ["minute", d.getMinutes()], ["second", d.getSeconds()]];
+    for (const [k, v] of parts) r.m.set(k, v);
+    return r;
+  }],
+  ["randomcolor", 0, 0, "randomcolor()", () => `hsl(${Math.floor(Math.random() * 360)}, 70%, 55%)`],
+  ["mix", 3, 3, 'mix("#ff0000", "#0000ff", 0.5)', ([a, b, t], f) => {
+    const p = parseColor(str(a, "mix", f), f), q = parseColor(str(b, "mix", f), f), k = num(t, "mix", f);
+    const c = p.map((v, i) => Math.round(v + (q[i] - v) * k));
+    return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+  }]
+];
+function parseColor(c, f) {
+  let m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(c.trim());
+  if (m) return m.slice(1).map((h) => parseInt(h, 16));
+  m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(c.trim());
+  if (m) return m.slice(1).map((h) => parseInt(h + h, 16));
+  m = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i.exec(c.trim());
+  if (m) return m.slice(1).map(Number);
+  return f(`\`mix\` needs colors written as codes like "#ff8800" or rgb(...), but got "${c}".`);
+}
+var genDefs = [
+  ["map", 2, 2, "map(numbers, given n: n * 2)", function* ([x, fn], call, f) {
+    const out = [];
+    for (const v of [...list(x, "map", f)]) out.push(yield* call(fn, [v]));
+    return out;
+  }],
+  ["filter", 2, 2, "filter(numbers, given n: n is above 0)", function* ([x, fn], call, f) {
+    const out = [];
+    for (const v of [...list(x, "filter", f)]) if (truthy(yield* call(fn, [v]))) out.push(v);
+    return out;
+  }],
+  ["reduce", 3, 3, "reduce(numbers, given total and n: total + n, 0)", function* ([x, fn, start], call, f) {
+    let acc = start;
+    for (const v of [...list(x, "reduce", f)]) acc = yield* call(fn, [acc, v]);
+    return acc;
+  }],
+  ["sortby", 2, 2, "sortby(enemies, given e: e's x)", function* ([x, fn], call, f) {
+    const l = [...list(x, "sortby", f)];
+    const keyed = [];
+    for (const v of l) keyed.push([yield* call(fn, [v]), v]);
+    const allNum = keyed.every(([k]) => typeof k === "number"), allText = keyed.every(([k]) => typeof k === "string");
+    if (!allNum && !allText) return f("The instructions given to `sortby` must give back only numbers, or only text.");
+    keyed.sort((p, q) => allNum ? p[0] - q[0] : String(p[0]).localeCompare(String(q[0])));
+    return keyed.map(([, v]) => v);
+  }],
+  ["some", 2, 2, "some(enemies, given e: e touches player)", function* ([x, fn], call, f) {
+    for (const v of [...list(x, "some", f)]) if (truthy(yield* call(fn, [v]))) return true;
+    return false;
+  }],
+  ["all", 2, 2, "all(scores, given s: s is above 0)", function* ([x, fn], call, f) {
+    for (const v of [...list(x, "all", f)]) if (!truthy(yield* call(fn, [v]))) return false;
+    return true;
   }]
 ];
 function clean(n) {
@@ -395,7 +610,18 @@ function builtins() {
   }
   return m;
 }
-var BUILTIN_NAMES = defs.map((d) => d[0]);
+function genBuiltins() {
+  const m = /* @__PURE__ */ new Map();
+  for (const [name, min, max, usage, fn] of genDefs) {
+    m.set(name, new GenBuiltin(name, (args, call, fail2) => {
+      arity(name, args, min, max, fail2, usage);
+      return fn(args, call, fail2);
+    }));
+  }
+  return m;
+}
+var HOST_BUILTINS = ["ask", "measure", "direction", "nearest"];
+var BUILTIN_NAMES = [...defs.map((d) => d[0]), ...genDefs.map((d) => d[0]), ...HOST_BUILTINS];
 
 // src/world.ts
 var WIDTH = 480;
@@ -568,6 +794,8 @@ var Runner = class {
     __publicField(this, "frameWait", 0);
     __publicField(this, "mouseRec", new Rec());
     for (const [name, b] of builtins()) this.globals.vars.set(name, b);
+    for (const [name, b] of genBuiltins()) this.globals.vars.set(name, b);
+    this.hostBuiltins();
     const g = this.globals.vars;
     g.set("width", WIDTH);
     g.set("height", HEIGHT);
@@ -920,7 +1148,156 @@ var Runner = class {
       case "expr":
         yield* this.eval(s.e, env);
         return;
+      case "choose": {
+        const v = yield* this.eval(s.subject, env);
+        for (const c of s.cases) {
+          for (const x of c.vals) {
+            if (equals(v, yield* this.eval(x, env))) return yield* this.block(c.body, env);
+          }
+        }
+        if (s.els) return yield* this.block(s.els, env);
+        return;
+      }
+      case "try": {
+        try {
+          return yield* this.block(s.body, env);
+        } catch (e) {
+          if (!(e instanceof OnceError)) throw e;
+          this.setVar("problem", e.message, env);
+          if (s.handler) return yield* this.block(s.handler, env);
+          return;
+        }
+      }
+      case "fail":
+        runtimeError(s.s, textOf(yield* this.eval(s.value, env)), "This is a `fail` in the program. Wrap the code in `try ... otherwise ... end` to handle it.");
+      case "check": {
+        const e = s.e;
+        if (e.k === "bin" && ["eq", "ne", "lt", "gt", "le", "ge"].includes(e.op)) {
+          const a = yield* this.eval(e.a, env), b = yield* this.eval(e.b, env);
+          if (!truthy(this.binary(e.op, a, b, e))) runtimeError(s.s, `A check failed: the left side is ${textOf(a, true)} and the right side is ${textOf(b, true)}.`, "`check` stops the program when something that should be true is not.");
+          return;
+        }
+        if (!truthy(yield* this.eval(e, env))) runtimeError(s.s, "A check failed: this was not true.", "`check` stops the program when something that should be true is not.");
+        return;
+      }
+      case "pass":
+        return;
+      case "forget": {
+        const t = s.target;
+        if (t.k === "var") {
+          const found = env.find(t.name);
+          if (!found) this.unknown(t.name, t.s, env);
+          found.vars.delete(t.name);
+        } else if (t.k === "prop") {
+          const obj = yield* this.eval(t.obj, env);
+          if (obj instanceof Rec) obj.m.delete(t.name);
+          else if (obj instanceof Thing) obj.extra.delete(t.name);
+          else runtimeError(t.obj.s, `I can only forget names, or values inside records and shapes, but this is ${typeName(obj)}.`);
+        } else if (t.k === "index") {
+          const obj = yield* this.eval(t.obj, env), idx = yield* this.eval(t.idx, env);
+          if (Array.isArray(obj)) obj.splice(this.listIndex(obj, idx, t.idx.s, false), 1);
+          else if (obj instanceof Rec) obj.m.delete(textOf(idx));
+          else runtimeError(t.obj.s, `I can't forget an item of ${typeName(obj)}.`);
+        }
+        return;
+      }
+      case "swap": {
+        const a = yield* this.eval(s.a, env), b = yield* this.eval(s.b, env);
+        yield* this.assign(s.a, b, env);
+        yield* this.assign(s.b, a, env);
+        return;
+      }
+      case "after": {
+        const n = yield* this.eval(s.e, env);
+        if (typeof n !== "number" || n < 0) runtimeError(s.e.s, `\`after\` needs a number of seconds, but got ${typeName(n)}.`);
+        const self = this, body = s.body;
+        const gen = function* () {
+          yield { wait: n };
+          return yield* self.block(body, env);
+        }();
+        this.tasks.push({ gen, wakeAt: 0, perFrame: false, forever: 0, done: false });
+        return;
+      }
+      case "waituntil":
+        while (!truthy(yield* this.eval(s.e, env))) yield "frame";
+        return;
+      case "save": {
+        const found = env.find(s.name);
+        if (!found) this.unknown(s.name, s.s, env);
+        let json;
+        try {
+          json = JSON.stringify(toSaved(found.vars.get(s.name)));
+        } catch (err) {
+          runtimeError(s.s, `\`${s.name}\` is ${typeName(found.vars.get(s.name))}, which can't be saved.`, "Numbers, text, true/false, lists and records can be saved.");
+        }
+        this.host.save?.(s.name, json);
+        return;
+      }
+      case "load": {
+        const raw = this.host.load?.(s.name);
+        if (raw == null) return;
+        try {
+          this.setVar(s.name, fromSaved(JSON.parse(raw)), env);
+        } catch {
+        }
+        return;
+      }
+      case "move": {
+        const things = this.thingsOf(yield* this.eval(s.target, env), s.target.s, false);
+        const x = this.num(yield* this.eval(s.x, env), s.x.s, "move"), y = this.num(yield* this.eval(s.y, env), s.y.s, "move");
+        for (const t of things) {
+          if (s.mode === "by") {
+            t.x += x;
+            t.y += y;
+          } else {
+            t.x = x;
+            t.y = y;
+          }
+        }
+        return;
+      }
+      case "turn": {
+        const things = this.thingsOf(yield* this.eval(s.target, env), s.target.s, false);
+        const a = this.num(yield* this.eval(s.e, env), s.e.s, "turn");
+        for (const t of things) t.angle = s.mode === "by" ? t.angle + a : a;
+        return;
+      }
     }
+  }
+  /** Built-ins that need the host or the picture. */
+  hostBuiltins() {
+    const g = this.globals.vars;
+    g.set("ask", new Builtin("ask", (args, fail2) => {
+      if (args.length > 1) fail2("`ask` needs one question.", 'Like `set name to ask("What is your name?")`.');
+      const answer = this.host.ask ? this.host.ask(args.length ? textOf(args[0]) : "") : null;
+      return answer;
+    }));
+    g.set("measure", new Builtin("measure", (args, fail2) => {
+      if (args.length < 1 || args.length > 2) fail2("`measure` needs text and, if you like, a size.", 'Like `measure("Score", 20)`.');
+      const size = args[1] === void 0 ? 20 : args[1];
+      if (typeof size !== "number") return fail2(`The size has to be a number, but got ${typeName(size)}.`);
+      return this.world.measure(textOf(args[0]), size);
+    }));
+    g.set("direction", new Builtin("direction", (args, fail2) => {
+      const [a, b] = args;
+      if (args.length !== 2 || !(a instanceof Thing) || !(b instanceof Thing)) return fail2("`direction` needs two shapes.", "Like `direction(enemy, player)`. It gives back the angle from the first to the second.");
+      return Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+    }));
+    g.set("nearest", new Builtin("nearest", (args, fail2) => {
+      const [a, l] = args;
+      if (args.length !== 2 || !(a instanceof Thing) || !Array.isArray(l)) return fail2("`nearest` needs a shape and a list of shapes.", "Like `nearest(player, enemies)`.");
+      let best = null, bd = Infinity;
+      for (const t of l) {
+        if (!(t instanceof Thing)) return fail2("Every item in the list has to be a shape.");
+        if (t === a || t.removed) continue;
+        const d = Math.hypot(t.x - a.x, t.y - a.y);
+        if (d < bd) {
+          bd = d;
+          best = t;
+        }
+      }
+      return best;
+    }));
   }
   noGraphics(sp) {
     runtimeError(
@@ -1097,6 +1474,32 @@ var Runner = class {
         this.world.add(t);
         return t;
       }
+      case "lambda":
+        return new Lambda(e.params, e.body, env);
+      case "isa": {
+        const v = yield* this.eval(e.v, env);
+        return kindOf(v) === e.kind;
+      }
+      case "between": {
+        const v = yield* this.eval(e.v, env), lo = yield* this.eval(e.lo, env), hi = yield* this.eval(e.hi, env);
+        for (const [x, sp] of [[v, e.v.s], [lo, e.lo.s], [hi, e.hi.s]]) {
+          if (typeof x !== "number") runtimeError(sp, `\`between\` compares numbers, but this is ${typeName(x)}.`);
+        }
+        return v >= Math.min(lo, hi) && v <= Math.max(lo, hi);
+      }
+      case "comp": {
+        const l = yield* this.eval(e.list, env);
+        const items = typeof l === "string" ? [...l] : l instanceof Rec ? [...l.m.keys()] : l;
+        if (!Array.isArray(items)) runtimeError(e.list.s, `\`for each\` needs a list, but got ${typeName(l)}.`);
+        const local = new Env(env);
+        const out = [];
+        for (const it of items) {
+          local.vars.set(e.name, it);
+          if (e.cond && !truthy(yield* this.eval(e.cond, local))) continue;
+          out.push(yield* this.eval(e.item, local));
+        }
+        return out;
+      }
     }
   }
   *clauseValues(clauses, env) {
@@ -1174,10 +1577,22 @@ var Runner = class {
   }
   *call(fn, args, e) {
     const name = e.fn.k === "var" ? e.fn.name : e.fn.k === "prop" ? e.fn.name : "this";
-    if (fn instanceof Builtin) return fn.fn(args, (msg, hint) => runtimeError(e.s, msg, hint));
+    return yield* this.callValue(fn, args, e.s, name, e.fn.s);
+  }
+  /** Calls any instructions value: the story's own, quick `given` ones, or built-ins. */
+  *callValue(fn, args, sp, name = "this", fnSpan = sp) {
+    const fail2 = (msg, hint) => runtimeError(sp, msg, hint);
+    if (fn instanceof Builtin) return fn.fn(args, fail2);
+    if (fn instanceof GenBuiltin) return yield* fn.gen(args, (f, a) => this.callValue(f, a, sp, "instructions"), fail2);
+    if (fn instanceof Lambda) {
+      if (args.length !== fn.params.length) runtimeError(sp, `These quick instructions need ${fn.params.length} input${fn.params.length === 1 ? "" : "s"} (${fn.params.join(", ")}), but got ${args.length}.`);
+      const local2 = new Env(fn.closure);
+      fn.params.forEach((p, i) => local2.vars.set(p, args[i]));
+      return yield* this.eval(fn.body, local2);
+    }
     if (!(fn instanceof Fn)) {
       runtimeError(
-        e.fn.s,
+        fnSpan,
         `\`${name}\` is ${typeName(fn)}, not instructions, so it can't be used with ( ).`,
         fn instanceof Thing || fn instanceof Rec ? `To read a property, write ${name}'s x.` : void 0
       );
@@ -1185,14 +1600,14 @@ var Runner = class {
     const params = fn.def.params;
     if (args.length !== params.length) {
       runtimeError(
-        e.s,
+        sp,
         `\`${fn.def.name}\` needs ${params.length} input${params.length === 1 ? "" : "s"}${params.length ? ` (${params.join(", ")})` : ""}, but got ${args.length}.`,
         params.length ? `Like ${fn.def.name}(${params.join(", ")}).` : `Like ${fn.def.name}().`
       );
     }
     if (++this.depth > 300) {
       this.depth = 0;
-      runtimeError(e.s, `\`${fn.def.name}\` went more than 300 calls deep, so it probably never stops.`, "Make sure there is an `if` that gives back a value without calling it again. Once allows 300 calls inside each other.");
+      runtimeError(sp, `\`${fn.def.name}\` went more than 300 calls deep, so it probably never stops.`, "Make sure there is an `if` that gives back a value without calling it again. Once allows 300 calls inside each other.");
     }
     const local = new Env(fn.closure);
     params.forEach((p, i) => local.vars.set(p, args[i]));
@@ -1228,6 +1643,8 @@ var Runner = class {
         const bs = this.thingsOf(b, e.b.s, true);
         return as.some((x) => bs.some((y) => this.world.touches(x, y)));
       }
+      case "in":
+        return this.binary("contains", b, a, { ...e, a: e.b, b: e.a });
       case "contains": {
         if (Array.isArray(a)) return a.some((x) => equals(x, b));
         if (typeof a === "string") return a.includes(textOf(b));
@@ -1684,7 +2101,9 @@ var RESERVED = /* @__PURE__ */ new Set([
   "mod",
   "of",
   "touches",
-  "contains"
+  "contains",
+  "given",
+  "case"
 ]);
 var STATEMENTS = [
   "say",
@@ -1708,8 +2127,20 @@ var STATEMENTS = [
   "remove",
   "hide",
   "show",
-  "new"
+  "new",
+  "choose",
+  "try",
+  "fail",
+  "check",
+  "forget",
+  "swap",
+  "after",
+  "save",
+  "load",
+  "move",
+  "turn"
 ];
+var SOFT = /* @__PURE__ */ new Set(["choose", "try", "fail", "check", "do", "forget", "swap", "after", "save", "load", "move", "turn"]);
 var FROM_ELSEWHERE = {
   print: "say",
   log: "say",
@@ -1719,6 +2150,16 @@ var FROM_ELSEWHERE = {
   return: "give back",
   def: "to",
   function: "to",
+  raise: "fail",
+  throw: "fail",
+  assert: "check",
+  pass: "do nothing",
+  del: "forget",
+  match: "choose",
+  switch: "choose",
+  except: "otherwise",
+  catch: "otherwise",
+  lambda: "given",
   func: "to",
   fn: "to",
   let: "set",
@@ -1743,7 +2184,8 @@ var KIND_ALIASES = { square: "box", rectangle: "box", rect: "box", dot: "circle"
 var NOTE_CLAUSES = { for: [1, 1], wave: [1, 1], volume: [1, 1] };
 var SOUND_CLAUSES = { volume: [1, 1] };
 var END_WORDS = /* @__PURE__ */ new Set(["if", "repeat", "for", "to", "every", "when", "each"]);
-var VALUE_WORDS = /* @__PURE__ */ new Set(["true", "false", "nothing", "random", "any", "holding", "not", "new"]);
+var VALUE_WORDS = /* @__PURE__ */ new Set(["true", "false", "nothing", "random", "any", "holding", "not", "new", "given"]);
+var KIND_WORDS = /* @__PURE__ */ new Set(["number", "text", "truth", "list", "record", "shape", "thing", "instructions", "nothing"]);
 function parse(src) {
   const p = new Parser(lex(src));
   return p.program();
@@ -1887,6 +2329,14 @@ var Parser = class _Parser {
   statement() {
     const t = this.peek();
     if (t.t !== "id") return this.exprStatement();
+    if (SOFT.has(t.v)) {
+      const n = this.peek(1);
+      const usedAsName = n.t === "poss" || n.t === "op" && ["(", ".", "[", "="].includes(n.v);
+      if (!usedAsName) {
+        const s = this.softStatement(t);
+        if (s) return s;
+      }
+    }
     switch (t.v) {
       case "set": {
         this.next();
@@ -1945,6 +2395,7 @@ var Parser = class _Parser {
         break;
       case "wait": {
         this.next();
+        if (this.eatWord("until")) return { k: "waituntil", e: this.expr(), s: this.spanFrom(t) };
         const e = this.expr();
         if (!this.eatWord("seconds") && !this.eatWord("second")) {
           if (this.peek().t === "id" && /^(sec|secs|s|ms|frames?|minutes?)$/.test(this.peek().v)) {
@@ -1997,6 +2448,8 @@ var Parser = class _Parser {
       case "show":
         this.next();
         return { k: t.v, e: this.expr(), s: this.spanFrom(t) };
+      case "case":
+        syntaxError(span(t), "`case` only goes inside a `choose` block.", 'Like:\nchoose day\n  case "sat", "sun"\n    say "weekend"\nend');
       case "end":
         syntaxError(span(t), "There is an extra `end` here. Nothing is open for it to close.", "Check that each `end` matches an if, repeat, for each, to, every or when above it.");
       case "otherwise":
@@ -2011,6 +2464,120 @@ var Parser = class _Parser {
         syntaxError(span(t), "`times` goes after a number in a repeat, like `repeat 3 times`.");
     }
     return this.exprStatement();
+  }
+  softStatement(t) {
+    switch (t.v) {
+      case "choose":
+        return this.choose();
+      case "try":
+        return this.tryStatement();
+      case "fail":
+        this.next();
+        if (this.atLineEnd()) syntaxError(span(t), "`fail` needs a message.", 'Like `fail "The level file is broken"`.');
+        return { k: "fail", value: this.expr(), s: this.spanFrom(t) };
+      case "check":
+        this.next();
+        if (this.atLineEnd()) syntaxError(span(t), "`check` needs something that should be true.", "Like `check lives is at least 0`.");
+        return { k: "check", e: this.expr(), s: this.spanFrom(t) };
+      case "do":
+        if (!this.isWord("nothing", 1)) return null;
+        this.next();
+        this.next();
+        return { k: "pass", s: this.spanFrom(t) };
+      case "forget":
+        this.next();
+        return { k: "forget", target: this.target(), s: this.spanFrom(t) };
+      case "swap": {
+        this.next();
+        const a = this.target();
+        this.expectWord("and", void 0, "Write it like `swap a and b`.");
+        const b = this.target();
+        return { k: "swap", a, b, s: this.spanFrom(t) };
+      }
+      case "after": {
+        this.next();
+        const e = this.expr();
+        if (!this.eatWord("seconds") && !this.eatWord("second")) syntaxError(span(this.peek()), "After the number, write `seconds`.", "Like `after 2 seconds`.");
+        const sp = this.spanFrom(t);
+        this.headerEnd(t);
+        const [loops, inFn] = [this.loops, this.inFn];
+        this.loops = 0;
+        this.inFn = false;
+        const body = this.block(t, ["end"]);
+        this.loops = loops;
+        this.inFn = inFn;
+        this.closeBlock(t);
+        return { k: "after", e, body, s: sp };
+      }
+      case "save":
+      case "load": {
+        this.next();
+        const n = this.name(t.v === "save" ? "value to save" : "value to load");
+        return { k: t.v, name: n.v, s: this.spanFrom(t) };
+      }
+      case "move":
+      case "turn": {
+        this.next();
+        const target = this.postfix();
+        let mode;
+        if (this.eatWord("by")) mode = "by";
+        else {
+          this.expectWord("to", `After \`${t.v} ...\`, write \`by\` or \`to\`.`, t.v === "move" ? "Like `move player by 4, 0` or `move player to 240, 180`." : "Like `turn box by 15` or `turn box to 90`.");
+          mode = "to";
+        }
+        if (t.v === "turn") return { k: "turn", target, mode, e: this.expr(), s: this.spanFrom(t) };
+        const x = this.expr();
+        this.expectOp(",", void 0, "Moving needs two numbers, across and down, like `move player by 4, 0`.");
+        const y = this.expr();
+        return { k: "move", target, mode, x, y, s: this.spanFrom(t) };
+      }
+    }
+    return null;
+  }
+  choose() {
+    const start = this.next();
+    const subject = this.expr();
+    const sp = this.spanFrom(start);
+    this.headerEnd(start);
+    const cases = [];
+    let els = null;
+    const stops = ["case", "otherwise", "else", "end"];
+    for (; ; ) {
+      this.skipNl();
+      const t = this.peek();
+      if (t.t === "id" && t.v === "case") {
+        this.next();
+        if (els) syntaxError(span(t), "This `case` comes after `otherwise`, so it can never happen.", "Put `otherwise` last.");
+        const vals = [this.additive()];
+        while (this.eatOp(",") || this.eatWord("or")) vals.push(this.additive());
+        this.eatWord("then");
+        this.headerEnd(t);
+        cases.push({ vals, body: this.block(start, stops) });
+      } else if (t.t === "id" && (t.v === "otherwise" || t.v === "else")) {
+        this.next();
+        if (els) syntaxError(span(t), "This `choose` already has an `otherwise`.");
+        this.headerEnd(t);
+        els = this.block(start, stops);
+      } else if (t.t === "id" && t.v === "end") break;
+      else if (t.t === "eof") syntaxError(span(start), `This \`choose\` on line ${start.line} is never closed with \`end\`.`);
+      else syntaxError(span(t), "Inside `choose`, each choice starts with `case`.", 'Like:\nchoose day\n  case "sat", "sun"\n    say "weekend"\n  otherwise\n    say "work"\nend');
+    }
+    if (!cases.length) syntaxError(span(start), "This `choose` has no `case` lines.");
+    this.closeBlock(start);
+    return { k: "choose", subject, cases, els, s: sp };
+  }
+  tryStatement() {
+    const start = this.next();
+    this.headerEnd(start);
+    const body = this.block(start, ["otherwise", "else", "end"]);
+    let handler = null;
+    if (this.isWord("otherwise") || this.isWord("else")) {
+      const o = this.next();
+      this.headerEnd(o);
+      handler = this.block(start, ["end"]);
+    }
+    this.closeBlock(start);
+    return { k: "try", body, handler, s: span(start) };
   }
   exprStatement() {
     const t = this.peek();
@@ -2285,8 +2852,26 @@ var Parser = class _Parser {
     let op = null;
     if (t.t === "id" && t.v === "is") {
       this.next();
-      if (this.eatWord("not")) op = "ne";
-      else if (this.eatWord("above")) op = "gt";
+      const neg = this.eatWord("not");
+      const wrap = (e2) => neg ? { k: "un", op: "not", a: e2, s: e2.s } : e2;
+      const art = this.isWord("a") || this.isWord("an");
+      const kindTok = this.peek(art ? 1 : 0);
+      if (kindTok.t === "id" && (art ? KIND_WORDS.has(kindTok.v) : kindTok.v === "text" && this.peek(1).t !== "op" && this.peek(1).t !== "poss")) {
+        if (art) this.next();
+        this.next();
+        return wrap({ k: "isa", v: a, kind: kindTok.v === "shape" || kindTok.v === "thing" ? "shape" : kindTok.v, s: this.spanFrom(t) });
+      }
+      if (this.eatWord("between")) {
+        const lo = this.additive();
+        this.expectWord("and", void 0, "Write it like `x is between 1 and 10`.");
+        const hi = this.additive();
+        return wrap({ k: "between", v: a, lo, hi, s: join(a.s, hi.s, t) });
+      }
+      if (this.eatWord("in")) {
+        const b3 = this.additive();
+        return wrap({ k: "bin", op: "in", a, b: b3, s: join(a.s, b3.s, t) });
+      }
+      if (this.eatWord("above")) op = "gt";
       else if (this.eatWord("below")) op = "lt";
       else if (this.isWord("more") || this.isWord("greater") || this.isWord("bigger")) {
         this.next();
@@ -2300,6 +2885,11 @@ var Parser = class _Parser {
         this.next();
         op = this.next().v === "least" ? "ge" : "le";
       } else op = "eq";
+      const b2 = this.additive();
+      const e = { k: "bin", op, a, b: b2, s: join(a.s, b2.s, t) };
+      if (!neg) return e;
+      if (op === "eq") return { ...e, op: "ne" };
+      return wrap(e);
     } else if (t.t === "op" && ["=", "==", "!=", "<", ">", "<=", ">="].includes(t.v)) {
       this.next();
       op = { "=": "eq", "==": "eq", "!=": "ne", "<": "lt", ">": "gt", "<=": "le", ">=": "ge" }[t.v];
@@ -2406,6 +2996,16 @@ var Parser = class _Parser {
         while (!this.isOp("]")) {
           if (this.peek().t === "eof") break;
           items.push(this.expr());
+          if (items.length === 1 && this.isWord("for")) {
+            this.next();
+            this.eatWord("each");
+            const name = this.name("item").v;
+            this.expectWord("in", void 0, "Write it like `[x * 2 for each x in numbers]`.");
+            const list2 = this.expr();
+            const cond = this.eatWord("if") ? this.expr() : null;
+            this.expectOp("]", void 0, "A list made with `for each` ends with `]`.");
+            return { k: "comp", item: items[0], name, list: list2, cond, s: this.spanFrom(t) };
+          }
           if (!this.eatOp(",")) break;
         }
         this.expectOp("]", `I expected \`]\` to close the list started on line ${t.line}, but found ${describe(this.peek())}.`, "Items in a list are separated by commas.");
@@ -2450,6 +3050,17 @@ var Parser = class _Parser {
           this.next();
           this.expectWord("of", void 0, "Write it like `any of colors`, to pick one at random.");
           return { k: "any", list: this.unary(), s: this.spanFrom(t) };
+        }
+        case "given": {
+          this.next();
+          const params = [];
+          while (!this.isOp(":")) {
+            if (params.length && !this.eatWord("and") && !this.eatOp(",")) syntaxError(span(this.peek()), "Separate the inputs with `and`, then end with `:`.", "Like `given a and b: a + b`.");
+            params.push(this.name("input").v);
+          }
+          this.next();
+          const body = this.expr();
+          return { k: "lambda", params, body, s: this.spanFrom(t) };
         }
         case "holding": {
           this.next();
@@ -2570,7 +3181,7 @@ function exportPage(code, runtimeJs, title) {
 }
 
 // src/cli.ts
-var USAGE = `Once ${"0.1.0"}: a little language for moving pictures.
+var USAGE = `Once ${"0.2.0"}: a little language for moving pictures.
 
   once run <story.once>                 run a story (say, numbers, lists, waits)
   once check <story.once>               look for mistakes without running
@@ -2617,7 +3228,15 @@ function run(file) {
     playSound: () => {
     },
     holding: () => false,
-    mouse: () => ({ x: 0, y: 0, down: false })
+    mouse: () => ({ x: 0, y: 0, down: false }),
+    ask: (q) => readLine(q),
+    save: (k, json) => {
+      const saves = readSaves();
+      saves[k] = json;
+      (0, import_node_fs.mkdirSync)(SAVE_DIR, { recursive: true });
+      (0, import_node_fs.writeFileSync)(SAVE_FILE, JSON.stringify(saves, null, 2));
+    },
+    load: (k) => readSaves()[k] ?? null
   });
   runner.frameWait = 1 / 60;
   runner.start();
@@ -2633,6 +3252,33 @@ function run(file) {
     else setTimeout(step, Math.min(1e3, wait * 1e3));
   };
   step();
+}
+var SAVE_DIR = (0, import_node_path.join)((0, import_node_os.homedir)(), ".once");
+var SAVE_FILE = (0, import_node_path.join)(SAVE_DIR, "saves.json");
+function readSaves() {
+  try {
+    return JSON.parse((0, import_node_fs.readFileSync)(SAVE_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+function readLine(question) {
+  process.stdout.write(question ? question + " " : "> ");
+  const buf = Buffer.alloc(1);
+  const bytes = [];
+  for (; ; ) {
+    let n = 0;
+    try {
+      n = (0, import_node_fs.readSync)(0, buf, 0, 1, null);
+    } catch (e) {
+      if (e.code === "EAGAIN") continue;
+      break;
+    }
+    if (n === 0) return bytes.length ? Buffer.from(bytes).toString("utf8") : null;
+    if (buf[0] === 10) break;
+    bytes.push(buf[0]);
+  }
+  return Buffer.from(bytes).toString("utf8").replace(/\r$/, "");
 }
 function check(file) {
   const src = read(file);
@@ -2673,7 +3319,7 @@ switch (cmd) {
   case "version":
   case "--version":
   case "-v":
-    console.log("0.1.0");
+    console.log("0.2.0");
     break;
   case void 0:
   case "help":

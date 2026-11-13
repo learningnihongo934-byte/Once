@@ -1,0 +1,102 @@
+-- choose / case
+for each d in ["sat", "mon", "xyz"]
+  choose d
+    case "sat", "sun"
+      say "weekend"
+    case "mon" or "tue"
+      say "work"
+    otherwise
+      say "huh"
+  end
+end
+-- try / fail / problem
+try
+  say number("abc")
+otherwise
+  say "caught: {problem}"
+end
+try
+  fail "custom trouble"
+otherwise
+  say problem
+end
+-- check, do nothing, forget, swap
+check 1 + 1 is 2
+if true
+  do nothing
+end
+set a to 1
+set b to 2
+swap a and b
+say "{a} {b}"
+set r to {x: 1, y: 2}
+forget r's x
+say r
+set xs to [10, 20, 30]
+forget item 2 of xs
+say xs
+-- operators
+say 5 is between 1 and 10
+say 5 is not between 6 and 10
+say 3 is in [1, 2, 3]
+say "z" is not in "abc"
+say 4 is a number
+say "hi" is text
+say [1] is a list
+say {} is a record
+say nothing is a number
+say [x * x for each x in [1, 2, 3, 4] if x is above 1]
+set double to given n: n * 2
+say double(21)
+say map([1, 2, 3], given n: n + 1)
+say filter(range(1, 10), given n: n mod 3 is 0)
+say reduce([1, 2, 3, 4], given t and n: t + n, 0)
+say sortby(["ccc", "a", "bb"], given w: length(w))
+say some([1, 2], given n: n is above 1)
+say all([1, 2], given n: n is above 1)
+-- new built-ins
+say exp(0)
+say log(1000, 10)
+say sign(-4)
+say lerp(0, 10, 0.5)
+say average([1, 2, 3])
+say round(asin(1))
+say round(atan(1))
+say trim("  hi  ")
+say replace("a-b-c", "-", "+")
+say slice("hello", 2, 4)
+say slice([1, 2, 3, 4], -2)
+say title("good morning")
+say count([1, 6, 6], 6)
+say code("A")
+say letter(66)
+say begins("hello", "he")
+say ends("main.once", ".once")
+say pad(7, 3, "0")
+set st to [1, 2, 3]
+say pop(st)
+say insert(st, 1, 0)
+say unique([1, 1, 2])
+say flatten([[1, 2], [3]])
+say zip(["a", "b"], [1, 2])
+say fill(3, "x")
+set c to copy([[1]])
+say c
+say values({a: 1, b: 2})
+say merge({a: 1}, {b: 2})
+say type(3)
+say type("x")
+say type(given n: n)
+say mix("#000000", "#ffffff", 0.5)
+say length of shuffle([1, 2, 3])
+say length of sample([1, 2, 3], 2)
+say type(now()'s year)
+say chance(100)
+-- wait until, after
+set ready to false
+after 0.2 seconds
+  set ready to true
+  say "after fired"
+end
+wait until ready
+say "waited"
