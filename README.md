@@ -57,7 +57,7 @@ Once is a tree-walking interpreter written in TypeScript. Every statement runs a
 Needs Node 18 or newer.
 
 ```bash
-./build.sh            # build the playground, Book and CLI into dist/
+./build.sh            # build the playground, docs, CLI and extension
 ./build.sh test       # type-check and run every test program, example and docs listing
 ./build.sh serve      # http://localhost:8830
 ./build.sh deploy     # publish to once.rennko.tech (Cloudflare Workers)
